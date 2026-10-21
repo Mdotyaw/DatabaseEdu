@@ -1,0 +1,2597 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DATA CONTROL CENTER // Simulasi Basis Data Interaktif SMK Kelas 11</title>
+  <meta name="description" content="Aplikasi simulasi interaktif pembelajaran Basis Data untuk siswa SMK Kelas 11 tanpa mengetik SQL. Visual ERD Designer, Query Builder, dan Join Laboratory.">
+  
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Google Fonts: Inter & JetBrains Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  
+  <!-- React 18 & Babel Standalone -->
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  
+  <!-- Canvas Confetti for Celebration -->
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.2/dist/confetti.browser.min.js"></script>
+
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+            mono: ['JetBrains Mono', 'monospace'],
+          },
+          colors: {
+            cyber: {
+              bg: '#070b14',
+              card: '#0d1527',
+              border: '#1e293b',
+              accent: '#06b6d4',
+              emerald: '#10b981',
+              violet: '#8b5cf6',
+              amber: '#f59e0b',
+              rose: '#f43f5e',
+            }
+          },
+          animation: {
+            'pulse-glow': 'pulseGlow 2s infinite ease-in-out',
+            'dash-flow': 'dashFlow 1.5s linear infinite',
+            'scanline': 'scanline 4s linear infinite',
+          },
+          keyframes: {
+            pulseGlow: {
+              '0%, 100%': { filter: 'drop-shadow(0 0 4px rgba(6, 182, 212, 0.4))' },
+              '50%': { filter: 'drop-shadow(0 0 14px rgba(6, 182, 212, 0.9))' },
+            },
+            dashFlow: {
+              'to': { strokeDashoffset: '-20' },
+            },
+            scanline: {
+              '0%': { transform: 'translateY(-100%)' },
+              '100%': { transform: 'translateY(1000%)' },
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    /* Custom Scrollbar for Sci-Fi theme */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #090e1a;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #1e293b;
+      border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #06b6d4;
+    }
+
+    /* Grid canvas background pattern */
+    .cyber-grid {
+      background-size: 28px 28px;
+      background-image: 
+        linear-gradient(to right, rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+    }
+
+    .glow-cyan {
+      box-shadow: 0 0 20px -3px rgba(6, 182, 212, 0.35);
+    }
+    .glow-emerald {
+      box-shadow: 0 0 20px -3px rgba(16, 185, 129, 0.4);
+    }
+    .glow-rose {
+      box-shadow: 0 0 20px -3px rgba(244, 63, 94, 0.4);
+    }
+
+    /* Range slider custom styling */
+    input[type=range] {
+      -webkit-appearance: none;
+      background: #1e293b;
+      border-radius: 9999px;
+      height: 8px;
+    }
+    input[type=range]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      height: 20px;
+      width: 20px;
+      border-radius: 50%;
+      background: #06b6d4;
+      cursor: pointer;
+      box-shadow: 0 0 10px #06b6d4;
+      transition: all 0.15s ease;
+    }
+    input[type=range]::-webkit-slider-thumb:hover {
+      transform: scale(1.2);
+      background: #22d3ee;
+    }
+  </style>
+</head>
+<body class="bg-[#060a12] text-slate-100 font-sans antialiased selection:bg-cyan-500 selection:text-black min-h-screen overflow-x-hidden">
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useRef, useMemo } = React;
+
+    // --- Web Audio API Procedural SFX ---
+    class SoundEngine {
+      constructor() {
+        this.ctx = null;
+        this.muted = false;
+      }
+
+      init() {
+        if (!this.ctx) {
+          const AudioContext = window.AudioContext || window.webkitAudioContext;
+          if (AudioContext) {
+            this.ctx = new AudioContext();
+          }
+        }
+        if (this.ctx && this.ctx.state === 'suspended') {
+          this.ctx.resume();
+        }
+      }
+
+      playTone(freq, type, duration, gainVal = 0.1) {
+        if (this.muted) return;
+        try {
+          this.init();
+          if (!this.ctx) return;
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.type = type;
+          osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
+          gain.gain.setValueAtTime(gainVal, this.ctx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.0001, this.ctx.currentTime + duration);
+          osc.connect(gain);
+          gain.connect(this.ctx.destination);
+          osc.start();
+          osc.stop(this.ctx.currentTime + duration);
+        } catch(e) {}
+      }
+
+      click() {
+        this.playTone(800, 'sine', 0.08, 0.08);
+      }
+
+      success() {
+        if (this.muted) return;
+        this.init();
+        if (!this.ctx) return;
+        const now = this.ctx.currentTime;
+        [523.25, 659.25, 783.99, 1046.50].forEach((freq, i) => {
+          setTimeout(() => {
+            this.playTone(freq, 'triangle', 0.25, 0.12);
+          }, i * 90);
+        });
+      }
+
+      alert() {
+        if (this.muted) return;
+        this.init();
+        if (!this.ctx) return;
+        this.playTone(220, 'sawtooth', 0.3, 0.15);
+        setTimeout(() => this.playTone(180, 'sawtooth', 0.3, 0.15), 120);
+      }
+
+      whoosh() {
+        if (this.muted) return;
+        this.init();
+        if (!this.ctx) return;
+        this.playTone(320, 'sine', 0.2, 0.09);
+        setTimeout(() => this.playTone(480, 'sine', 0.25, 0.07), 80);
+      }
+    }
+
+    const sfx = new SoundEngine();
+
+    // --- Mock Database Information for ERD ---
+    const INITIAL_ERD_TABLES = [
+      {
+        id: 'kelas',
+        title: 'Tabel: Kelas',
+        subtitle: 'Induk Data Rombel',
+        x: 60,
+        y: 80,
+        color: 'border-cyan-500/40 bg-slate-900/90',
+        headerColor: 'bg-gradient-to-r from-cyan-950 to-slate-900 text-cyan-300 border-cyan-500/30',
+        columns: [
+          { name: 'id_kelas', type: 'INT', isPK: true, isFK: false, desc: 'Kunci Utama Unik Kelas' },
+          { name: 'nama_kelas', type: 'VARCHAR(20)', isPK: false, isFK: false, desc: 'Misal: XI RPL 1' },
+          { name: 'tingkat', type: 'INT', isPK: false, isFK: false, desc: 'Tingkatan (10, 11, 12)' },
+          { name: 'id_wali', type: 'INT', isPK: false, isFK: true, desc: 'Mengacu ke Wali Kelas' },
+        ],
+        sampleData: [
+          { id_kelas: 1, nama_kelas: 'XI RPL 1', tingkat: 11, id_wali: 101 },
+          { id_kelas: 2, nama_kelas: 'XI RPL 2', tingkat: 11, id_wali: 102 },
+          { id_kelas: 3, nama_kelas: 'XI TKJ 1', tingkat: 11, id_wali: 103 },
+        ]
+      },
+      {
+        id: 'siswa',
+        title: 'Tabel: Siswa',
+        subtitle: 'Data Anggota Pelajar',
+        x: 480,
+        y: 40,
+        color: 'border-emerald-500/40 bg-slate-900/90',
+        headerColor: 'bg-gradient-to-r from-emerald-950 to-slate-900 text-emerald-300 border-emerald-500/30',
+        columns: [
+          { name: 'id_siswa', type: 'INT', isPK: true, isFK: false, desc: 'Nomor Pokok Siswa' },
+          { name: 'nisn', type: 'VARCHAR(10)', isPK: false, isFK: false, desc: 'NISN Nasional' },
+          { name: 'nama_siswa', type: 'VARCHAR(50)', isPK: false, isFK: false, desc: 'Nama Lengkap Siswa' },
+          { name: 'id_kelas', type: 'INT', isPK: false, isFK: true, desc: 'Relasi ke Tabel Kelas' },
+          { name: 'jurusan', type: 'VARCHAR(10)', isPK: false, isFK: false, desc: 'Keahlian (RPL/TKJ)' },
+        ],
+        sampleData: [
+          { id_siswa: 201, nisn: '0071234567', nama_siswa: 'Ahmad Rizky Pratama', id_kelas: 1, jurusan: 'RPL' },
+          { id_siswa: 202, nisn: '0078765432', nama_siswa: 'Siti Nurhaliza Putri', id_kelas: 1, jurusan: 'RPL' },
+          { id_siswa: 203, nisn: '0073344556', nama_siswa: 'Bagas Aditya Putra', id_kelas: 3, jurusan: 'TKJ' },
+          { id_siswa: 204, nisn: '0079988776', nama_siswa: 'Dewi Lestari', id_kelas: 2, jurusan: 'RPL' },
+        ]
+      },
+      {
+        id: 'wali_kelas',
+        title: 'Tabel: Wali_Kelas',
+        subtitle: 'Data Guru Pembimbing',
+        x: 60,
+        y: 420,
+        color: 'border-violet-500/40 bg-slate-900/90',
+        headerColor: 'bg-gradient-to-r from-violet-950 to-slate-900 text-violet-300 border-violet-500/30',
+        columns: [
+          { name: 'id_wali', type: 'INT', isPK: true, isFK: false, desc: 'Kunci Utama Wali Kelas' },
+          { name: 'nama_guru', type: 'VARCHAR(50)', isPK: false, isFK: false, desc: 'Nama & Gelar Pendidik' },
+          { name: 'nip', type: 'VARCHAR(18)', isPK: false, isFK: false, desc: 'NIP Resmi Guru' },
+          { name: 'no_telp', type: 'VARCHAR(15)', isPK: false, isFK: false, desc: 'Kontak Darurat Rombel' },
+        ],
+        sampleData: [
+          { id_wali: 101, nama_guru: 'Budi Santoso, S.Kom', nip: '198501022010011005', no_telp: '081234567890' },
+          { id_wali: 102, nama_guru: 'Ratna Sari, M.Pd', nip: '198807152014022002', no_telp: '081398765432' },
+          { id_wali: 103, nama_guru: 'Hendro Wijaya, S.T', nip: '197903102008011003', no_telp: '085712344321' },
+        ]
+      },
+      {
+        id: 'mapel',
+        title: 'Tabel: Mata_Pelajaran',
+        subtitle: 'Katalog Kurikulum SMK',
+        x: 480,
+        y: 420,
+        color: 'border-amber-500/40 bg-slate-900/90',
+        headerColor: 'bg-gradient-to-r from-amber-950 to-slate-900 text-amber-300 border-amber-500/30',
+        columns: [
+          { name: 'kode_mapel', type: 'VARCHAR(10)', isPK: true, isFK: false, desc: 'Kode Unik Mata Pelajaran' },
+          { name: 'nama_mapel', type: 'VARCHAR(50)', isPK: false, isFK: false, desc: 'Nama Pelajaran (Basis Data dll)' },
+          { name: 'jam_pelajaran', type: 'INT', isPK: false, isFK: false, desc: 'Durasi Jam Tatap Muka' },
+        ],
+        sampleData: [
+          { kode_mapel: 'BD-01', nama_mapel: 'Basis Data Terapan', jam_pelajaran: 6 },
+          { kode_mapel: 'PBO-02', nama_mapel: 'Pemrograman Berorientasi Objek', jam_pelajaran: 8 },
+          { kode_mapel: 'PWPB-03', nama_mapel: 'Pemrograman Web & Perangkat Bergerak', jam_pelajaran: 8 },
+        ]
+      }
+    ];
+
+    // --- Mock Data for Query Builder ---
+    const SAMPLE_STUDENTS_DATA = [
+      { id: 1, nisn: '007101', nama: 'Ahmad Rizky Pratama', jurusan: 'RPL', nilai: 88, kehadiran: 95, status: 'Lulus' },
+      { id: 2, nisn: '007102', nama: 'Siti Nurhaliza Putri', jurusan: 'RPL', nilai: 94, kehadiran: 98, status: 'Lulus' },
+      { id: 3, nisn: '007103', nama: 'Bagas Aditya Putra', jurusan: 'TKJ', nilai: 72, kehadiran: 85, status: 'Lulus' },
+      { id: 4, nisn: '007104', nama: 'Dewi Ayu Lestari', jurusan: 'RPL', nilai: 64, kehadiran: 78, status: 'Remidi' },
+      { id: 5, nisn: '007105', nama: 'Farhan Maulana', jurusan: 'TKJ', nilai: 85, kehadiran: 92, status: 'Lulus' },
+      { id: 6, nisn: '007106', nama: 'Jessica Amelia', jurusan: 'DMM', nilai: 91, kehadiran: 96, status: 'Lulus' },
+      { id: 7, nisn: '007107', nama: 'Kevin Ananda', jurusan: 'DMM', nilai: 58, kehadiran: 70, status: 'Remidi' },
+      { id: 8, nisn: '007108', nama: 'Muhammad Ilham', jurusan: 'RPL', nilai: 79, kehadiran: 88, status: 'Lulus' },
+      { id: 9, nisn: '007109', nama: 'Nadia Salsabila', jurusan: 'TKJ', nilai: 83, kehadiran: 90, status: 'Lulus' },
+      { id: 10, nisn: '007110', nama: 'Rian Saputra', jurusan: 'RPL', nilai: 76, kehadiran: 86, status: 'Lulus' }
+    ];
+
+    // --- Mock Data for Join Lab ---
+    const TABLE_PEMINJAMAN = [
+      { id_pinjam: 101, id_siswa: 'S01', judul_buku: 'Mastering SQL & Database', tgl_pinjam: '12 Okt 2026' },
+      { id_pinjam: 102, id_siswa: 'S02', judul_buku: 'Arsitektur Jaringan Cisco', tgl_pinjam: '14 Okt 2026' },
+      { id_pinjam: 103, id_siswa: 'S01', judul_buku: 'React & Tailwind Modern', tgl_pinjam: '15 Okt 2026' },
+      { id_pinjam: 104, id_siswa: 'S03', judul_buku: 'UI/UX Design Workflow', tgl_pinjam: '18 Okt 2026' },
+      { id_pinjam: 105, id_siswa: 'S99', judul_buku: 'Panduan Desain Grafis', tgl_pinjam: '20 Okt 2026' }, // S99 has no student!
+    ];
+
+    const TABLE_DATA_SISWA = [
+      { id_siswa: 'S01', nama_siswa: 'Ahmad Rizky Pratama', kelas: 'XI RPL 1' },
+      { id_siswa: 'S02', nama_siswa: 'Siti Nurhaliza Putri', kelas: 'XI RPL 2' },
+      { id_siswa: 'S03', nama_siswa: 'Bagas Aditya Putra', kelas: 'XI TKJ 1' },
+      { id_siswa: 'S04', nama_siswa: 'Dewi Ayu Lestari', kelas: 'XI DMM 2' }, // S04 never borrowed books!
+    ];
+
+    // ==============================================================
+    // MAIN APPLICATION COMPONENT
+    // ==============================================================
+    function DatabaseTycoonApp() {
+      // Active Simulation Mode: 'erd' | 'query' | 'join'
+      const [activeTab, setActiveTab] = useState('erd');
+      
+      // Sound State
+      const [soundMuted, setSoundMuted] = useState(false);
+
+      // Missions State
+      const [missions, setMissions] = useState({
+        erd_connected: false,
+        query_executed: false,
+        join_tested: false
+      });
+
+      // Feedback Toast / Banner
+      const [toast, setToast] = useState({ show: false, title: '', message: '', type: 'success' });
+
+      // Modal state for glossary / guide
+      const [showHelpModal, setShowHelpModal] = useState(false);
+      const [showCertModal, setShowCertModal] = useState(false);
+
+      const showNotification = (title, message, type = 'success') => {
+        setToast({ show: true, title, message, type });
+        if (type === 'success') sfx.success();
+        else if (type === 'error') sfx.alert();
+        else sfx.click();
+
+        setTimeout(() => {
+          setToast(prev => ({ ...prev, show: false }));
+        }, 5000);
+      };
+
+      // Calculate precision score (0 - 100%)
+      const precisionScore = useMemo(() => {
+        let score = 0;
+        if (missions.erd_connected) score += 35;
+        if (missions.query_executed) score += 35;
+        if (missions.join_tested) score += 30;
+        return score;
+      }, [missions]);
+
+      // Trigger celebration when reaching 100%
+      useEffect(() => {
+        if (precisionScore === 100) {
+          sfx.success();
+          if (window.confetti) {
+            window.confetti({
+              particleCount: 120,
+              spread: 80,
+              origin: { y: 0.6 }
+            });
+          }
+        }
+      }, [precisionScore]);
+
+      const toggleSound = () => {
+        sfx.muted = !soundMuted;
+        setSoundMuted(!soundMuted);
+        if (soundMuted) sfx.click();
+      };
+
+      return (
+        <div className="flex flex-col min-h-screen bg-[#070b14] text-slate-100">
+          
+          {/* Top Control Bar / Header */}
+          <header className="sticky top-0 z-40 bg-[#0a0f1d]/90 backdrop-blur-md border-b border-slate-800/80 px-4 lg:px-8 py-3 transition-all">
+            <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-4">
+              
+              {/* Logo & Subtitle */}
+              <div className="flex items-center gap-3">
+                <div className="relative flex items-center justify-center w-11 h-11 rounded-xl bg-gradient-to-br from-cyan-500 to-blue-600 shadow-lg shadow-cyan-500/20 ring-1 ring-cyan-400/30">
+                  <span className="text-xl">🗄️</span>
+                  <span className="absolute -top-1 -right-1 flex h-3 w-3">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-3 w-3 bg-cyan-500"></span>
+                  </span>
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h1 className="text-lg lg:text-xl font-extrabold tracking-wider bg-gradient-to-r from-cyan-400 via-sky-300 to-indigo-300 bg-clip-text text-transparent">
+                      DATA CONTROL CENTER
+                    </h1>
+                    <span className="hidden sm:inline-flex px-2 py-0.5 text-[10px] font-mono tracking-wider font-semibold rounded bg-cyan-950/80 text-cyan-400 border border-cyan-800/50">
+                      SMK KELAS 11
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-400 font-medium">
+                    Simulasi Pembelajaran Basis Data Interaktif (100% Visual • Tanpa Mengetik SQL)
+                  </p>
+                </div>
+              </div>
+
+              {/* Mode Navigation Tabs */}
+              <div className="flex items-center bg-slate-900/90 p-1 rounded-xl border border-slate-800 text-xs font-semibold">
+                <button
+                  onClick={() => { setActiveTab('erd'); sfx.click(); }}
+                  className={`flex items-center gap-2 px-3.5 py-2 rounded-lg transition-all ${
+                    activeTab === 'erd'
+                      ? 'bg-gradient-to-r from-cyan-500 to-blue-600 text-white shadow-md shadow-cyan-500/30 font-bold'
+                      : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+                  }`}
+                >
+                  <span>🕸️</span>
+                  <span>1. ERD Designer</span>
+                </button>
+                <button
+                  onClick={() => { setActiveTab('query'); sfx.click(); }}
+                  className={`flex items-center gap-2 px-3.5 py-2 rounded-lg transition-all ${
+                    activeTab === 'query'
+                      ? 'bg-gradient-to-r from-emerald-500 to-teal-600 text-white shadow-md shadow-emerald-500/30 font-bold'
+                      : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+                  }`}
+                >
+                  <span>⚡</span>
+                  <span>2. Query Builder</span>
+                </button>
+                <button
+                  onClick={() => { setActiveTab('join'); sfx.click(); }}
+                  className={`flex items-center gap-2 px-3.5 py-2 rounded-lg transition-all ${
+                    activeTab === 'join'
+                      ? 'bg-gradient-to-r from-violet-500 to-purple-600 text-white shadow-md shadow-violet-500/30 font-bold'
+                      : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+                  }`}
+                >
+                  <span>🧬</span>
+                  <span>3. Join & Normalisasi</span>
+                </button>
+              </div>
+
+              {/* Right Side Stats & Actions */}
+              <div className="flex items-center gap-3">
+                {/* Precision Score Pill */}
+                <div className="flex items-center gap-3 bg-slate-900/90 border border-slate-800 px-3 py-1.5 rounded-xl">
+                  <div className="flex flex-col items-end">
+                    <span className="text-[10px] text-slate-400 font-mono uppercase tracking-wider">Skor Presisi</span>
+                    <span className="text-sm font-bold font-mono text-cyan-400">
+                      {precisionScore}%
+                    </span>
+                  </div>
+                  <div className="w-12 h-2.5 bg-slate-800 rounded-full overflow-hidden">
+                    <div 
+                      className={`h-full transition-all duration-700 ease-out ${
+                        precisionScore === 100 
+                          ? 'bg-gradient-to-r from-emerald-400 to-cyan-400' 
+                          : 'bg-gradient-to-r from-cyan-500 to-blue-500'
+                      }`}
+                      style={{ width: `${precisionScore}%` }}
+                    />
+                  </div>
+                </div>
+
+                {/* Sound Toggle */}
+                <button
+                  onClick={toggleSound}
+                  title={soundMuted ? 'Aktifkan Suara' : 'Matikan Suara'}
+                  className="p-2 rounded-xl bg-slate-900/80 hover:bg-slate-800 text-slate-400 hover:text-cyan-400 border border-slate-800 transition"
+                >
+                  {soundMuted ? '🔇' : '🔊'}
+                </button>
+
+                {/* Guide / Glossary Modal Button */}
+                <button
+                  onClick={() => { setShowHelpModal(true); sfx.click(); }}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-medium text-slate-200 border border-slate-700 transition"
+                >
+                  <span>💡</span>
+                  <span className="hidden sm:inline">Kamus Istilah</span>
+                </button>
+
+                {/* Certificate button if completed */}
+                {precisionScore === 100 && (
+                  <button
+                    onClick={() => { setShowCertModal(true); sfx.click(); }}
+                    className="animate-bounce flex items-center gap-1 px-3 py-1.5 rounded-xl bg-gradient-to-r from-amber-500 to-yellow-500 text-slate-950 text-xs font-bold shadow-lg shadow-amber-500/30"
+                  >
+                    <span>🏆</span>
+                    <span>Sertifikat</span>
+                  </button>
+                )}
+              </div>
+
+            </div>
+          </header>
+
+          {/* Mission HUD Bar (Gamifikasi Skenario SMK) */}
+          <div className="bg-slate-950/90 border-b border-slate-800/60 px-4 lg:px-8 py-2 text-xs">
+            <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-start md:items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <span className="px-2 py-0.5 rounded bg-cyan-950 border border-cyan-800 text-cyan-400 font-mono font-bold text-[10px] tracking-wider uppercase">
+                  🎯 MISI SISWA
+                </span>
+                <span className="text-slate-400 hidden sm:inline">
+                  Selesaikan 3 skenario praktikum untuk menguji pemahaman basis data:
+                </span>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2 sm:gap-4 w-full md:w-auto">
+                {/* Mission 1 */}
+                <div 
+                  onClick={() => { setActiveTab('erd'); sfx.click(); }}
+                  className={`flex items-center gap-2 px-2.5 py-1 rounded-lg border cursor-pointer transition ${
+                    missions.erd_connected 
+                      ? 'bg-emerald-950/40 border-emerald-500/50 text-emerald-300' 
+                      : 'bg-slate-900 border-slate-800 text-slate-400 hover:border-slate-700'
+                  }`}
+                >
+                  <span>{missions.erd_connected ? '✅' : '⚪'}</span>
+                  <span className="font-medium text-[11px]">1. Relasi PK ➔ FK (Kelas - Siswa)</span>
+                </div>
+
+                {/* Mission 2 */}
+                <div 
+                  onClick={() => { setActiveTab('query'); sfx.click(); }}
+                  className={`flex items-center gap-2 px-2.5 py-1 rounded-lg border cursor-pointer transition ${
+                    missions.query_executed 
+                      ? 'bg-emerald-950/40 border-emerald-500/50 text-emerald-300' 
+                      : 'bg-slate-900 border-slate-800 text-slate-400 hover:border-slate-700'
+                  }`}
+                >
+                  <span>{missions.query_executed ? '✅' : '⚪'}</span>
+                  <span className="font-medium text-[11px]">2. Filter Siswa RPL & Nilai &gt; 75</span>
+                </div>
+
+                {/* Mission 3 */}
+                <div 
+                  onClick={() => { setActiveTab('join'); sfx.click(); }}
+                  className={`flex items-center gap-2 px-2.5 py-1 rounded-lg border cursor-pointer transition ${
+                    missions.join_tested 
+                      ? 'bg-emerald-950/40 border-emerald-500/50 text-emerald-300' 
+                      : 'bg-slate-900 border-slate-800 text-slate-400 hover:border-slate-700'
+                  }`}
+                >
+                  <span>{missions.join_tested ? '✅' : '⚪'}</span>
+                  <span className="font-medium text-[11px]">3. Eksekusi Relasi INNER JOIN</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Floating Toast Notification */}
+          {toast.show && (
+            <div className="fixed bottom-6 right-6 z-50 max-w-md animate-slide-up">
+              <div className={`p-4 rounded-xl border shadow-2xl backdrop-blur-xl flex items-start gap-3 ${
+                toast.type === 'success' 
+                  ? 'bg-slate-900/95 border-emerald-500/50 text-emerald-200 shadow-emerald-950/50' 
+                  : 'bg-slate-900/95 border-rose-500/50 text-rose-200 shadow-rose-950/50'
+              }`}>
+                <span className="text-xl mt-0.5">{toast.type === 'success' ? '🎉' : '⚠️'}</span>
+                <div>
+                  <h4 className="font-bold text-sm text-white">{toast.title}</h4>
+                  <p className="text-xs mt-1 text-slate-300 leading-relaxed">{toast.message}</p>
+                </div>
+                <button 
+                  onClick={() => setToast(prev => ({ ...prev, show: false }))}
+                  className="text-slate-500 hover:text-white text-xs ml-auto"
+                >
+                  ✕
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Main Workspace Viewport */}
+          <main className="flex-1 flex flex-col p-4 lg:p-6 max-w-7xl mx-auto w-full">
+            {activeTab === 'erd' && (
+              <ErdDesignerModule 
+                onMissionComplete={() => {
+                  if (!missions.erd_connected) {
+                    setMissions(m => ({ ...m, erd_connected: true }));
+                    showNotification(
+                      'Misi 1 Selesai! (+35 Skor Presisi)',
+                      'Hebat! Kamu berhasil merelasikan Primary Key (id_kelas) dengan Foreign Key (id_kelas) di Tabel Siswa. Hubungan ini bertipe 1-to-Many!',
+                      'success'
+                    );
+                  }
+                }}
+                showNotification={showNotification}
+              />
+            )}
+
+            {activeTab === 'query' && (
+              <VisualQueryBuilderModule 
+                onMissionComplete={() => {
+                  if (!missions.query_executed) {
+                    setMissions(m => ({ ...m, query_executed: true }));
+                    showNotification(
+                      'Misi 2 Selesai! (+35 Skor Presisi)',
+                      'Luar biasa! Filter query berhasil dijalankan. Baris yang tidak memenuhi kriteria memudar, dan data yang cocok disorot terang.',
+                      'success'
+                    );
+                  }
+                }}
+                showNotification={showNotification}
+              />
+            )}
+
+            {activeTab === 'join' && (
+              <JoinNormalizationModule 
+                onMissionComplete={() => {
+                  if (!missions.join_tested) {
+                    setMissions(m => ({ ...m, join_tested: true }));
+                    showNotification(
+                      'Misi 3 Selesai! (+30 Skor Presisi)',
+                      'Sempurna! Kamu memahami cara kerja penggabungan tabel secara visual. Diagram Venn dan data baris saling bersatu.',
+                      'success'
+                    );
+                  }
+                }}
+                showNotification={showNotification}
+              />
+            )}
+          </main>
+
+          {/* Modal Kamus Istilah Siswa SMK */}
+          {showHelpModal && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in">
+              <div className="bg-slate-900 border border-slate-700 max-w-2xl w-full rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+                <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800 bg-slate-950/60">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xl">📘</span>
+                    <h3 className="font-bold text-base text-cyan-400">Kamus Konsep Basis Data (Khusus Siswa SMK)</h3>
+                  </div>
+                  <button 
+                    onClick={() => setShowHelpModal(false)}
+                    className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800"
+                  >
+                    ✕
+                  </button>
+                </div>
+
+                <div className="p-6 overflow-y-auto space-y-4 text-sm text-slate-300">
+                  <div className="p-3.5 rounded-xl bg-slate-800/50 border border-slate-700/60">
+                    <div className="flex items-center gap-2 font-bold text-emerald-400">
+                      <span>🔑 Primary Key (PK)</span>
+                    </div>
+                    <p className="text-xs text-slate-300 mt-1 leading-relaxed">
+                      Kolom penanda unik yang tidak boleh kembar (duplikat) dan tidak boleh kosong (NULL). 
+                      <strong>Analogi Nyata:</strong> Seperti NISN Siswa atau Nomor KTP. Tidak ada dua siswa yang memiliki NISN persis sama.
+                    </p>
+                  </div>
+
+                  <div className="p-3.5 rounded-xl bg-slate-800/50 border border-slate-700/60">
+                    <div className="flex items-center gap-2 font-bold text-cyan-400">
+                      <span>🔗 Foreign Key (FK) / Kunci Tamu</span>
+                    </div>
+                    <p className="text-xs text-slate-300 mt-1 leading-relaxed">
+                      Kolom di sebuah tabel anak yang menunjuk ke Primary Key di tabel induk untuk membentuk relasi.
+                      <strong>Contoh:</strong> Di Tabel Siswa ada kolom <code className="bg-slate-900 px-1 py-0.5 rounded text-cyan-300">id_kelas</code>. Angka ini merujuk ke <code className="bg-slate-900 px-1 py-0.5 rounded text-cyan-300">id_kelas</code> di Tabel Kelas.
+                    </p>
+                  </div>
+
+                  <div className="p-3.5 rounded-xl bg-slate-800/50 border border-slate-700/60">
+                    <div className="flex items-center gap-2 font-bold text-violet-400">
+                      <span>🔀 Relasi 1-to-Many (Satu ke Banyak)</span>
+                    </div>
+                    <p className="text-xs text-slate-300 mt-1 leading-relaxed">
+                      Satu baris di tabel induk bisa dimiliki oleh banyak baris di tabel anak. 
+                      <strong>Contoh:</strong> 1 Rombel Kelas (misal XI RPL 1) memiliki <strong>BANYAK</strong> Siswa. Tetapi setiap siswa hanya terdaftar di 1 Kelas.
+                    </p>
+                  </div>
+
+                  <div className="p-3.5 rounded-xl bg-slate-800/50 border border-slate-700/60">
+                    <div className="flex items-center gap-2 font-bold text-amber-400">
+                      <span>⚡ SQL Query & Filter WHERE</span>
+                    </div>
+                    <p className="text-xs text-slate-300 mt-1 leading-relaxed">
+                      Perintah untuk mengambil informasi tertentu dari ribuan baris data. Mirip seperti menyaring siswa yang nilainya di atas batas KKM (75).
+                    </p>
+                  </div>
+
+                  <div className="p-3.5 rounded-xl bg-slate-800/50 border border-slate-700/60">
+                    <div className="flex items-center gap-2 font-bold text-sky-400">
+                      <span>🧬 JOIN (Penggabungan Tabel)</span>
+                    </div>
+                    <p className="text-xs text-slate-300 mt-1 leading-relaxed">
+                      Teknik menyatukan baris dari 2 tabel yang berbeda berdasarkan kecocokan kunci (PK dan FK).
+                      <strong>INNER JOIN:</strong> Hanya menampilkan data yang benar-benar cocok di kedua sisi.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="p-4 border-t border-slate-800 bg-slate-950/80 flex justify-end">
+                  <button 
+                    onClick={() => setShowHelpModal(false)}
+                    className="px-4 py-2 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-semibold text-xs transition"
+                  >
+                    Siap, Saya Paham!
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Modal Sertifikat Kelulusan Misi */}
+          {showCertModal && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md">
+              <div className="relative bg-gradient-to-b from-slate-900 via-slate-950 to-black border-2 border-amber-500/60 max-w-lg w-full rounded-3xl p-8 shadow-2xl text-center glow-cyan">
+                <div className="w-20 h-20 mx-auto rounded-full bg-gradient-to-br from-amber-400 to-yellow-600 flex items-center justify-center text-4xl shadow-xl shadow-amber-500/40 mb-4 ring-4 ring-amber-400/20">
+                  🏆
+                </div>
+                <span className="px-3 py-1 rounded-full bg-amber-500/20 text-amber-400 text-xs font-mono font-bold tracking-widest uppercase border border-amber-500/40">
+                  PENGHARGAAN RESMI
+                </span>
+                <h2 className="text-2xl font-black text-white mt-3">
+                  SERTIFIKAT KEAHLIAN BASIS DATA
+                </h2>
+                <p className="text-xs text-slate-400 mt-1">SMK Rekayasa Perangkat Lunak / SIJA / TKJ</p>
+
+                <div className="my-6 p-4 rounded-2xl bg-slate-900/80 border border-slate-800 text-left space-y-2 text-xs">
+                  <div className="flex justify-between border-b border-slate-800 pb-2">
+                    <span className="text-slate-400">Kompetensi:</span>
+                    <span className="font-bold text-cyan-400">Pemodelan Relasi & Pengolahan Data</span>
+                  </div>
+                  <div className="flex justify-between border-b border-slate-800 pb-2">
+                    <span className="text-slate-400">Skor Presisi:</span>
+                    <span className="font-bold text-emerald-400">100% (Sempurna)</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-400">Predikat:</span>
+                    <span className="font-bold text-amber-400">Junior Database Architect</span>
+                  </div>
+                </div>
+
+                <p className="text-xs text-slate-400 italic">
+                  "Diberikan atas keberhasilan menuntaskan seluruh simulasi visual ERD, Query Builder, dan Relasi JOIN tanpa kesalahan logika."
+                </p>
+
+                <div className="mt-6 flex justify-center gap-3">
+                  <button 
+                    onClick={() => {
+                      if (window.confetti) window.confetti();
+                      setShowCertModal(false);
+                    }}
+                    className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 text-white font-bold text-xs shadow-lg shadow-cyan-500/30 hover:brightness-110 transition"
+                  >
+                    Tutup & Lanjutkan Eksplorasi
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Footer Info */}
+          <footer className="mt-auto border-t border-slate-800/60 bg-slate-950/80 px-6 py-3 text-center text-xs text-slate-500 flex flex-col sm:flex-row items-center justify-between gap-2">
+            <div>
+              Simulasi Interaktif Basis Data SMK Kelas 11 • Rekayasa Perangkat Lunak (RPL) & TJKT
+            </div>
+            <div className="flex items-center gap-3 font-mono text-[11px] text-slate-400">
+              <span className="flex items-center gap-1">
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                Node: Active
+              </span>
+              <span>•</span>
+              <span>100% Client-Side Interactive</span>
+            </div>
+          </footer>
+
+        </div>
+      );
+    }
+
+    // ==============================================================
+    // 1. ERD RELATION DESIGNER MODULE
+    // ==============================================================
+    function ErdDesignerModule({ onMissionComplete, showNotification }) {
+      const [tables, setTables] = useState(INITIAL_ERD_TABLES);
+      
+      // Saved connections: Array of { id, sourceTable, sourceCol, targetTable, targetCol, isValid, relationType, message }
+      const [connections, setConnections] = useState([
+        // Initial clean state with no active relations, or empty to let student drag!
+      ]);
+
+      // Active dragging connection state
+      const [dragState, setDragState] = useState(null); 
+      // { fromTable, fromCol, isPK, currentX, currentY }
+
+      // Dragging table card position
+      const [movingTable, setMovingTable] = useState(null); // { tableId, offsetX, offsetY }
+
+      // Preview Data Table Modal
+      const [previewTable, setPreviewTable] = useState(null);
+
+      // SVG Canvas Ref for coordinate transformation
+      const svgRef = useRef(null);
+      const canvasContainerRef = useRef(null);
+
+      // Handle Port MouseDown (Start drawing relation line)
+      const handlePortMouseDown = (e, tableId, col) => {
+        e.stopPropagation();
+        e.preventDefault();
+        sfx.click();
+
+        const canvasRect = canvasContainerRef.current.getBoundingClientRect();
+        const startX = e.clientX - canvasRect.left;
+        const startY = e.clientY - canvasRect.top;
+
+        setDragState({
+          fromTable: tableId,
+          fromCol: col.name,
+          isPK: col.isPK,
+          isFK: col.isFK,
+          currentX: startX,
+          currentY: startY,
+        });
+      };
+
+      // Handle Global MouseMove on Canvas
+      const handleMouseMove = (e) => {
+        if (dragState) {
+          const canvasRect = canvasContainerRef.current.getBoundingClientRect();
+          setDragState(prev => ({
+            ...prev,
+            currentX: e.clientX - canvasRect.left,
+            currentY: e.clientY - canvasRect.top,
+          }));
+        } else if (movingTable) {
+          const canvasRect = canvasContainerRef.current.getBoundingClientRect();
+          const newX = Math.max(10, Math.min(800, e.clientX - canvasRect.left - movingTable.offsetX));
+          const newY = Math.max(10, Math.min(700, e.clientY - canvasRect.top - movingTable.offsetY));
+          
+          setTables(prev => prev.map(t => t.id === movingTable.tableId ? { ...t, x: newX, y: newY } : t));
+        }
+      };
+
+      // Handle Port MouseUp (Establish connection)
+      const handlePortMouseUp = (e, targetTableId, targetCol) => {
+        e.stopPropagation();
+        if (!dragState) return;
+
+        const srcTable = dragState.fromTable;
+        const srcCol = dragState.fromCol;
+
+        // Validation Rules:
+        // Rule A: Kelas.id_kelas (PK) <-> Siswa.id_kelas (FK) => VALID 1-to-Many!
+        // Rule B: Wali_Kelas.id_wali (PK) <-> Kelas.id_wali (FK) => VALID 1-to-1!
+        const isSelfTable = srcTable === targetTableId;
+        
+        let isValid = false;
+        let relationType = '';
+        let message = '';
+
+        if (isSelfTable) {
+          isValid = false;
+          message = 'Relasi tidak boleh menghubungkan kolom di tabel yang sama!';
+        } else if (
+          (srcTable === 'kelas' && srcCol === 'id_kelas' && targetTableId === 'siswa' && targetCol.name === 'id_kelas') ||
+          (srcTable === 'siswa' && srcCol === 'id_kelas' && targetTableId === 'kelas' && targetCol.name === 'id_kelas')
+        ) {
+          isValid = true;
+          relationType = '1 : N (One to Many)';
+          message = 'Tepat sekali! 1 Kelas dapat memiliki banyak Siswa (Relasi 1-to-Many).';
+        } else if (
+          (srcTable === 'wali_kelas' && srcCol === 'id_wali' && targetTableId === 'kelas' && targetCol.name === 'id_wali') ||
+          (srcTable === 'kelas' && srcCol === 'id_wali' && targetTableId === 'wali_kelas' && targetCol.name === 'id_wali')
+        ) {
+          isValid = true;
+          relationType = '1 : 1 (One to One)';
+          message = 'Bagus! 1 Wali Kelas membimbing tepat 1 Kelas tertentu.';
+        } else {
+          isValid = false;
+          message = `Ups! Kolom '${srcCol}' dan '${targetCol.name}' tidak memiliki relasi Foreign Key yang valid. Pastikan Primary Key (PK) dihubungkan dengan Foreign Key (FK) yang tepat!`;
+        }
+
+        const newConn = {
+          id: `${srcTable}_${srcCol}__${targetTableId}_${targetCol.name}_${Date.now()}`,
+          sourceTable: srcTable,
+          sourceCol: srcCol,
+          targetTable: targetTableId,
+          targetCol: targetCol.name,
+          isValid,
+          relationType,
+          message
+        };
+
+        // Replace or add
+        setConnections(prev => [...prev.filter(c => 
+          !(c.sourceTable === srcTable && c.sourceCol === srcCol && c.targetTable === targetTableId && c.targetCol === targetCol.name)
+        ), newConn]);
+
+        setDragState(null);
+
+        if (isValid) {
+          sfx.success();
+          showNotification('Relasi Basis Data Valid! ✅', message, 'success');
+          onMissionComplete();
+        } else {
+          sfx.alert();
+          showNotification('Relasi Tidak Sesuai ⚠️', message, 'error');
+        }
+      };
+
+      // Handle Cancel Drag
+      const handleMouseUp = () => {
+        if (dragState) {
+          setDragState(null);
+        }
+        if (movingTable) {
+          setMovingTable(null);
+        }
+      };
+
+      // Helper to calculate port anchor coordinates
+      const getPortCoordinates = (tableId, colName) => {
+        const table = tables.find(t => t.id === tableId);
+        if (!table) return { x: 0, y: 0 };
+        
+        const colIndex = table.columns.findIndex(c => c.name === colName);
+        // Table width is 260px, header height ~ 48px, row height ~ 36px
+        const portY = table.y + 54 + (colIndex * 34) + 12;
+        // PK on left side or FK on right side
+        const portX = table.x + 258; // right edge anchor
+        return { x: portX, y: portY };
+      };
+
+      const getSourceCoordinates = (tableId, colName) => {
+        const table = tables.find(t => t.id === tableId);
+        if (!table) return { x: 0, y: 0 };
+        const colIndex = table.columns.findIndex(c => c.name === colName);
+        return {
+          x: table.x + 258,
+          y: table.y + 54 + (colIndex * 34) + 12
+        };
+      };
+
+      const getTargetCoordinates = (tableId, colName) => {
+        const table = tables.find(t => t.id === tableId);
+        if (!table) return { x: 0, y: 0 };
+        const colIndex = table.columns.findIndex(c => c.name === colName);
+        return {
+          x: table.x + 2,
+          y: table.y + 54 + (colIndex * 34) + 12
+        };
+      };
+
+      const deleteConnection = (id) => {
+        sfx.click();
+        setConnections(prev => prev.filter(c => c.id !== id));
+      };
+
+      const autoHintConnection = () => {
+        sfx.whoosh();
+        // Give student the solution if they get stuck
+        const validConn = {
+          id: `kelas_id_kelas__siswa_id_kelas_${Date.now()}`,
+          sourceTable: 'kelas',
+          sourceCol: 'id_kelas',
+          targetTable: 'siswa',
+          targetCol: 'id_kelas',
+          isValid: true,
+          relationType: '1 : N (One to Many)',
+          message: 'Relasi Kelas (PK: id_kelas) ke Siswa (FK: id_kelas) berhasil terhubung otomatis!'
+        };
+        setConnections(prev => [...prev.filter(c => !(c.sourceTable === 'kelas' && c.targetTable === 'siswa')), validConn]);
+        showNotification('Bantuan Relasi Diterapkan!', 'Garis hijau menghubungkan id_kelas di Tabel Kelas ke id_kelas di Tabel Siswa.', 'success');
+        onMissionComplete();
+      };
+
+      return (
+        <div className="flex flex-col gap-4">
+          
+          {/* Module Header & Instructions */}
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-slate-900/90 border border-slate-800 p-4 rounded-2xl">
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="p-1.5 rounded-lg bg-cyan-950 text-cyan-400 border border-cyan-800/60 font-mono text-xs">
+                  MODUL 1
+                </span>
+                <h2 className="text-base font-bold text-white">Visual ERD (Entity Relationship Diagram) Designer</h2>
+              </div>
+              <p className="text-xs text-slate-400 mt-1">
+                Tarik garis dari titik kolom <strong>Primary Key (🔑 PK)</strong> ke kolom <strong>Foreign Key (🔗 FK)</strong> untuk menghubungkan tabel. Geser kartu tabel untuk menata tata letak.
+              </p>
+            </div>
+
+            <div className="flex items-center gap-2 w-full sm:w-auto">
+              <button
+                onClick={autoHintConnection}
+                className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl bg-cyan-950/70 hover:bg-cyan-900/80 text-cyan-300 border border-cyan-700/60 text-xs font-semibold transition"
+              >
+                <span>✨</span>
+                <span>Beri Petunjuk Relasi</span>
+              </button>
+              <button
+                onClick={() => { setConnections([]); sfx.click(); }}
+                className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium border border-slate-700 transition"
+              >
+                Reset Garis
+              </button>
+            </div>
+          </div>
+
+          {/* Canvas Workspace */}
+          <div 
+            ref={canvasContainerRef}
+            onMouseMove={handleMouseMove}
+            onMouseUp={handleMouseUp}
+            className="relative w-full h-[620px] bg-[#090d18] cyber-grid rounded-2xl border border-slate-800/90 overflow-hidden shadow-inner select-none"
+          >
+            {/* Background Canvas Guide Watermark */}
+            <div className="absolute top-4 right-4 z-0 pointer-events-none text-right opacity-30">
+              <p className="font-mono text-[10px] text-cyan-400 tracking-wider">CANVAS COORDINATES: [X: 840, Y: 620]</p>
+              <p className="font-mono text-[9px] text-slate-500">ENGINE: SVG REALTIME BEZIER VECTOR</p>
+            </div>
+
+            {/* SVG Layer for Drawing Interactive Connection Lines */}
+            <svg 
+              ref={svgRef}
+              className="absolute inset-0 w-full h-full pointer-events-none z-10"
+            >
+              <defs>
+                {/* Glow filter for green relation */}
+                <filter id="glow-green" x="-20%" y="-20%" width="140%" height="140%">
+                  <feDropShadow dx="0" dy="0" stdDeviation="3" floodColor="#10b981" floodOpacity="0.8"/>
+                </filter>
+                <filter id="glow-red" x="-20%" y="-20%" width="140%" height="140%">
+                  <feDropShadow dx="0" dy="0" stdDeviation="3" floodColor="#f43f5e" floodOpacity="0.8"/>
+                </filter>
+              </defs>
+
+              {/* Render Existing Connections */}
+              {connections.map((conn) => {
+                const src = getSourceCoordinates(conn.sourceTable, conn.sourceCol);
+                const tgt = getTargetCoordinates(conn.targetTable, conn.targetCol);
+                
+                // Bezier curve control points
+                const dx = Math.abs(tgt.x - src.x) * 0.5;
+                const pathData = `M ${src.x} ${src.y} C ${src.x + dx} ${src.y}, ${tgt.x - dx} ${tgt.y}, ${tgt.x} ${tgt.y}`;
+                const midX = (src.x + tgt.x) / 2;
+                const midY = (src.y + tgt.y) / 2;
+
+                return (
+                  <g key={conn.id} className="cursor-pointer pointer-events-auto">
+                    {/* Shadow / Glow Line */}
+                    <path
+                      d={pathData}
+                      fill="none"
+                      stroke={conn.isValid ? '#10b981' : '#f43f5e'}
+                      strokeWidth={conn.isValid ? "3" : "2"}
+                      strokeDasharray={conn.isValid ? "6 3" : "4 4"}
+                      className={conn.isValid ? "animate-dash-flow" : ""}
+                      filter={conn.isValid ? "url(#glow-green)" : "url(#glow-red)"}
+                    />
+
+                    {/* Animated data pulses if valid */}
+                    {conn.isValid && (
+                      <circle r="4" fill="#34d399">
+                        <animateMotion path={pathData} dur="2s" repeatCount="indefinite" />
+                      </circle>
+                    )}
+
+                    {/* Central Badge on Line */}
+                    <g 
+                      transform={`translate(${midX - 50}, ${midY - 14})`}
+                      onClick={() => deleteConnection(conn.id)}
+                      className="transition-transform hover:scale-105"
+                    >
+                      <rect 
+                        width="100" 
+                        height="28" 
+                        rx="14" 
+                        fill={conn.isValid ? '#064e3b' : '#881337'} 
+                        stroke={conn.isValid ? '#34d399' : '#f43f5e'} 
+                        strokeWidth="1.5"
+                      />
+                      <text 
+                        x="50" 
+                        y="18" 
+                        fill="#ffffff" 
+                        fontSize="10" 
+                        fontWeight="bold" 
+                        textAnchor="middle"
+                        fontFamily="monospace"
+                      >
+                        {conn.isValid ? conn.relationType : 'RELASI SALAH ✕'}
+                      </text>
+                    </g>
+                  </g>
+                );
+              })}
+
+              {/* Render Currently Dragged Line */}
+              {dragState && (
+                (() => {
+                  const src = getSourceCoordinates(dragState.fromTable, dragState.fromCol);
+                  const tgtX = dragState.currentX;
+                  const tgtY = dragState.currentY;
+                  const dx = Math.abs(tgtX - src.x) * 0.5;
+                  const pathData = `M ${src.x} ${src.y} C ${src.x + dx} ${src.y}, ${tgtX - dx} ${tgtY}, ${tgtX} ${tgtY}`;
+
+                  return (
+                    <g>
+                      <path
+                        d={pathData}
+                        fill="none"
+                        stroke="#06b6d4"
+                        strokeWidth="2.5"
+                        strokeDasharray="5 5"
+                        className="animate-pulse"
+                      />
+                      <circle cx={tgtX} cy={tgtY} r="6" fill="#06b6d4" className="animate-ping" />
+                      <circle cx={tgtX} cy={tgtY} r="4" fill="#ffffff" />
+                    </g>
+                  );
+                })()
+              )}
+            </svg>
+
+            {/* Draggable Table Cards */}
+            {tables.map(table => (
+              <div
+                key={table.id}
+                style={{ transform: `translate(${table.x}px, ${table.y}px)` }}
+                className={`absolute w-[260px] rounded-xl border ${table.color} backdrop-blur-md shadow-2xl transition-shadow duration-200 z-20 hover:ring-1 hover:ring-cyan-500/50`}
+              >
+                {/* Table Header (Draggable handle) */}
+                <div 
+                  onMouseDown={(e) => {
+                    const canvasRect = canvasContainerRef.current.getBoundingClientRect();
+                    setMovingTable({
+                      tableId: table.id,
+                      offsetX: (e.clientX - canvasRect.left) - table.x,
+                      offsetY: (e.clientY - canvasRect.top) - table.y,
+                    });
+                  }}
+                  className={`flex items-center justify-between px-3 py-2.5 rounded-t-xl border-b cursor-grab active:cursor-grabbing ${table.headerColor}`}
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm">📋</span>
+                    <div>
+                      <h4 className="font-bold text-xs tracking-wide">{table.title}</h4>
+                      <p className="text-[10px] opacity-75 font-mono">{table.subtitle}</p>
+                    </div>
+                  </div>
+                  
+                  {/* Eye button to peek data */}
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      sfx.click();
+                      setPreviewTable(table);
+                    }}
+                    title="Lihat Data Isi Tabel"
+                    className="p-1 rounded hover:bg-white/10 text-slate-300 hover:text-white transition"
+                  >
+                    👁️
+                  </button>
+                </div>
+
+                {/* Column List */}
+                <div className="p-2 space-y-1">
+                  {table.columns.map((col) => {
+                    // Check if column is connected
+                    const isConnected = connections.some(c => 
+                      c.isValid && (
+                        (c.sourceTable === table.id && c.sourceCol === col.name) ||
+                        (c.targetTable === table.id && c.targetCol === col.name)
+                      )
+                    );
+
+                    return (
+                      <div
+                        key={col.name}
+                        className={`relative flex items-center justify-between px-2.5 py-1.5 rounded-lg border text-xs font-mono transition-all ${
+                          isConnected 
+                            ? 'bg-emerald-950/40 border-emerald-500/40 text-emerald-300' 
+                            : 'bg-slate-950/50 border-slate-800/80 text-slate-300 hover:bg-slate-800/50'
+                        }`}
+                      >
+                        {/* Target Anchor Dot on the LEFT (for receiving lines) */}
+                        <div
+                          onMouseUp={(e) => handlePortMouseUp(e, table.id, col)}
+                          title={`Hubungkan ke ${col.name}`}
+                          className={`absolute -left-2.5 w-4 h-4 rounded-full flex items-center justify-center cursor-pointer transition-all ${
+                            dragState ? 'bg-cyan-500 ring-4 ring-cyan-500/40 animate-pulse' : 'bg-slate-800 border border-slate-600 hover:bg-cyan-400'
+                          }`}
+                        >
+                          <div className="w-1.5 h-1.5 rounded-full bg-white"></div>
+                        </div>
+
+                        {/* Column Name and Badge */}
+                        <div className="flex items-center gap-1.5 truncate">
+                          {col.isPK && (
+                            <span className="px-1 py-0.2 rounded bg-amber-500/20 text-amber-400 border border-amber-500/30 text-[9px] font-bold">
+                              PK
+                            </span>
+                          )}
+                          {col.isFK && (
+                            <span className="px-1 py-0.2 rounded bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 text-[9px] font-bold">
+                              FK
+                            </span>
+                          )}
+                          <span className="font-semibold text-[11px] truncate">{col.name}</span>
+                        </div>
+
+                        {/* Data Type */}
+                        <div className="flex items-center gap-2">
+                          <span className="text-[10px] text-slate-500">{col.type}</span>
+
+                          {/* Source Anchor Dot on the RIGHT (for pulling lines) */}
+                          <div
+                            onMouseDown={(e) => handlePortMouseDown(e, table.id, col)}
+                            title={`Tarik garis relasi dari ${col.name}`}
+                            className="w-4 h-4 rounded-full bg-slate-800 border border-slate-600 hover:bg-cyan-400 hover:border-cyan-300 cursor-crosshair flex items-center justify-center transition-all group"
+                          >
+                            <div className="w-1.5 h-1.5 rounded-full bg-cyan-400 group-hover:scale-125 transition"></div>
+                          </div>
+                        </div>
+
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Table Footer Card Tip */}
+                <div className="px-3 py-1.5 bg-slate-950/60 rounded-b-xl border-t border-slate-800/80 text-[10px] text-slate-400 flex justify-between items-center">
+                  <span>{table.columns.length} Kolom</span>
+                  <span className="text-[9px] font-mono text-cyan-400/80">Tarik port ➔</span>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Quick Guidance Box */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
+            <div className="p-3 rounded-xl bg-slate-900/70 border border-slate-800 flex items-start gap-2.5">
+              <span className="text-lg">💡</span>
+              <div>
+                <strong className="text-cyan-400">Cara Merelasikan:</strong>
+                <p className="text-slate-400 mt-0.5">Tarik titik biru di kanan kolom <strong>id_kelas</strong> (Tabel Kelas) menuju titik kolom <strong>id_kelas</strong> (Tabel Siswa).</p>
+              </div>
+            </div>
+            <div className="p-3 rounded-xl bg-slate-900/70 border border-slate-800 flex items-start gap-2.5">
+              <span className="text-lg">🚦</span>
+              <div>
+                <strong className="text-emerald-400">Garis Hijau & Merah:</strong>
+                <p className="text-slate-400 mt-0.5">Garis hijau berdenyut menandakan relasi logis valid. Garis merah berarti tipe data atau relasi tidak cocok.</p>
+              </div>
+            </div>
+            <div className="p-3 rounded-xl bg-slate-900/70 border border-slate-800 flex items-start gap-2.5">
+              <span className="text-lg">🖐️</span>
+              <div>
+                <strong className="text-violet-400">Atur Posisi Bebas:</strong>
+                <p className="text-slate-400 mt-0.5">Klik dan tahan header tabel untuk menggeser kartu tabel kemana saja sesuai kenyamananmu.</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Preview Table Data Modal */}
+          {previewTable && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+              <div className="bg-slate-900 border border-slate-700 max-w-2xl w-full rounded-2xl shadow-2xl overflow-hidden animate-fade-in">
+                <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800 bg-slate-950">
+                  <div className="flex items-center gap-2">
+                    <span className="text-lg">📋</span>
+                    <h3 className="font-bold text-sm text-cyan-400">Isi Data Fiktif: {previewTable.title}</h3>
+                  </div>
+                  <button 
+                    onClick={() => setPreviewTable(null)}
+                    className="text-slate-400 hover:text-white"
+                  >
+                    ✕
+                  </button>
+                </div>
+                <div className="p-6 overflow-x-auto">
+                  <table className="w-full text-left text-xs font-mono">
+                    <thead>
+                      <tr className="border-b border-slate-800 text-slate-400 bg-slate-950/50">
+                        {previewTable.columns.map(c => (
+                          <th key={c.name} className="p-2.5">
+                            {c.name} {c.isPK && '🔑'} {c.isFK && '🔗'}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-800/60">
+                      {previewTable.sampleData.map((row, idx) => (
+                        <tr key={idx} className="hover:bg-slate-800/40">
+                          {previewTable.columns.map(c => (
+                            <td key={c.name} className="p-2.5 text-slate-200">
+                              {String(row[c.name])}
+                            </td>
+                          ))}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <div className="p-4 border-t border-slate-800 bg-slate-950 flex justify-end">
+                  <button
+                    onClick={() => setPreviewTable(null)}
+                    className="px-4 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs text-white"
+                  >
+                    Tutup
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+        </div>
+      );
+    }
+
+    // ==============================================================
+    // 2. VISUAL QUERY BUILDER MODULE
+    // ==============================================================
+    function VisualQueryBuilderModule({ onMissionComplete, showNotification }) {
+      const [data, setData] = useState(SAMPLE_STUDENTS_DATA);
+      
+      // Filter 1 State
+      const [filterCol, setFilterCol] = useState('jurusan');
+      const [filterOp, setFilterOp] = useState('=');
+      const [filterValNum, setFilterValNum] = useState(75);
+      const [filterValStr, setFilterValStr] = useState('RPL');
+
+      // Filter 2 State (Optional AND condition)
+      const [enableSecondFilter, setEnableSecondFilter] = useState(false);
+      const [filter2Col, setFilter2Col] = useState('nilai');
+      const [filter2Op, setFilter2Op] = useState('>');
+      const [filter2ValNum, setFilter2ValNum] = useState(75);
+
+      // Sorting
+      const [sortBy, setSortBy] = useState('none'); // 'none', 'nilai_desc', 'nilai_asc', 'nama_asc'
+
+      // Field Visibility (SELECT columns)
+      const [visibleCols, setVisibleCols] = useState({
+        id: true,
+        nisn: true,
+        nama: true,
+        jurusan: true,
+        nilai: true,
+        kehadiran: true,
+        status: true,
+      });
+
+      // Filter Execution Status
+      const [hasExecuted, setHasExecuted] = useState(false);
+      const [matchedIds, setMatchedIds] = useState(data.map(d => d.id));
+      const [isScanning, setIsScanning] = useState(false);
+
+      // Execute Filter
+      const runQuery = () => {
+        sfx.whoosh();
+        setIsScanning(true);
+
+        setTimeout(() => {
+          setIsScanning(false);
+          setHasExecuted(true);
+
+          const matches = data.filter(item => {
+            // Check condition 1
+            let match1 = false;
+            if (filterCol === 'jurusan') {
+              match1 = filterOp === '=' ? item.jurusan === filterValStr : item.jurusan !== filterValStr;
+            } else if (filterCol === 'status') {
+              match1 = filterOp === '=' ? item.status === filterValStr : item.status !== filterValStr;
+            } else if (filterCol === 'nilai') {
+              const val = Number(filterValNum);
+              if (filterOp === '>') match1 = item.nilai > val;
+              else if (filterOp === '>=') match1 = item.nilai >= val;
+              else if (filterOp === '<') match1 = item.nilai < val;
+              else if (filterOp === '=') match1 = item.nilai === val;
+              else if (filterOp === '!=') match1 = item.nilai !== val;
+            } else if (filterCol === 'kehadiran') {
+              const val = Number(filterValNum);
+              if (filterOp === '>') match1 = item.kehadiran > val;
+              else if (filterOp === '>=') match1 = item.kehadiran >= val;
+              else if (filterOp === '<') match1 = item.kehadiran < val;
+              else if (filterOp === '=') match1 = item.kehadiran === val;
+            }
+
+            // Check condition 2 if enabled
+            if (!enableSecondFilter) return match1;
+
+            let match2 = false;
+            if (filter2Col === 'nilai') {
+              const val = Number(filter2ValNum);
+              if (filter2Op === '>') match2 = item.nilai > val;
+              else if (filter2Op === '>=') match2 = item.nilai >= val;
+              else if (filter2Op === '<') match2 = item.nilai < val;
+              else if (filter2Op === '=') match2 = item.nilai === val;
+            } else if (filter2Col === 'kehadiran') {
+              const val = Number(filter2ValNum);
+              if (filter2Op === '>') match2 = item.kehadiran > val;
+              else if (filter2Op === '<') match2 = item.kehadiran < val;
+            }
+
+            return match1 && match2;
+          });
+
+          const ids = matches.map(m => m.id);
+          setMatchedIds(ids);
+
+          // Check if Mission 2 completed: Jurusan RPL & Nilai > 75 (either as filter 1 or composite)
+          const isRplFiltered = (filterCol === 'jurusan' && filterValStr === 'RPL') || (enableSecondFilter && filter2Col === 'jurusan');
+          const isNilaiFiltered = (filterCol === 'nilai' && (filterOp === '>' || filterOp === '>=') && filterValNum >= 75) ||
+                                  (enableSecondFilter && filter2Col === 'nilai' && (filter2Op === '>' || filter2Op === '>=') && filter2ValNum >= 70);
+
+          if (isRplFiltered && isNilaiFiltered) {
+            onMissionComplete();
+          } else {
+            sfx.success();
+            showNotification('Query Berhasil Dijalankan!', `Ditemukan ${ids.length} dari ${data.length} baris yang cocok dengan kriteria visualmu.`, 'success');
+          }
+
+        }, 400);
+      };
+
+      const resetFilter = () => {
+        sfx.click();
+        setFilterCol('jurusan');
+        setFilterOp('=');
+        setFilterValStr('RPL');
+        setFilterValNum(75);
+        setEnableSecondFilter(false);
+        setHasExecuted(false);
+        setMatchedIds(data.map(d => d.id));
+        setSortBy('none');
+      };
+
+      // Auto-set preset for Mission 2
+      const setMission2Preset = () => {
+        sfx.whoosh();
+        setFilterCol('jurusan');
+        setFilterOp('=');
+        setFilterValStr('RPL');
+        setEnableSecondFilter(true);
+        setFilter2Col('nilai');
+        setFilter2Op('>');
+        setFilter2ValNum(75);
+        showNotification('Preset Misi 2 Dipasang!', 'Klik tombol [JALANKAN FILTER] untuk mengeksekusi penyaringan data.', 'success');
+      };
+
+      // Process Sorting
+      const sortedData = useMemo(() => {
+        let list = [...data];
+        if (sortBy === 'nilai_desc') list.sort((a, b) => b.nilai - a.nilai);
+        else if (sortBy === 'nilai_asc') list.sort((a, b) => a.nilai - b.nilai);
+        else if (sortBy === 'nama_asc') list.sort((a, b) => a.nama.localeCompare(b.nama));
+        return list;
+      }, [data, sortBy]);
+
+      // Generated Visual SQL representation
+      const generatedSql = useMemo(() => {
+        const selectedColumns = Object.keys(visibleCols).filter(k => visibleCols[k]).join(', ');
+        let whereClause = '';
+        if (filterCol === 'jurusan' || filterCol === 'status') {
+          whereClause += `${filterCol} ${filterOp} '${filterValStr}'`;
+        } else {
+          whereClause += `${filterCol} ${filterOp} ${filterValNum}`;
+        }
+
+        if (enableSecondFilter) {
+          whereClause += ` AND ${filter2Col} ${filter2Op} ${filter2ValNum}`;
+        }
+
+        let orderClause = '';
+        if (sortBy === 'nilai_desc') orderClause = ' ORDER BY nilai DESC';
+        else if (sortBy === 'nilai_asc') orderClause = ' ORDER BY nilai ASC';
+        else if (sortBy === 'nama_asc') orderClause = ' ORDER BY nama ASC';
+
+        return `SELECT ${selectedColumns || '*'} \nFROM Siswa \nWHERE ${whereClause}${orderClause};`;
+      }, [visibleCols, filterCol, filterOp, filterValStr, filterValNum, enableSecondFilter, filter2Col, filter2Op, filter2ValNum, sortBy]);
+
+      return (
+        <div className="flex flex-col gap-5">
+          
+          {/* Module Header */}
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-slate-900/90 border border-slate-800 p-4 rounded-2xl">
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="p-1.5 rounded-lg bg-emerald-950 text-emerald-400 border border-emerald-800/60 font-mono text-xs">
+                  MODUL 2
+                </span>
+                <h2 className="text-base font-bold text-white">Visual Query Builder & Data Inspector</h2>
+              </div>
+              <p className="text-xs text-slate-400 mt-1">
+                Atur kriteria filter menggunakan slider dan tombol visual. Baris yang tidak cocok akan <strong>memudar (fade out)</strong> dan data yang lolos akan <strong>disorot (highlight)</strong>.
+              </p>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                onClick={setMission2Preset}
+                className="px-3 py-1.5 rounded-xl bg-emerald-950/70 hover:bg-emerald-900/80 text-emerald-300 border border-emerald-700/60 text-xs font-semibold transition"
+              >
+                ✨ Atur Preset Misi 2
+              </button>
+              <button
+                onClick={resetFilter}
+                className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium border border-slate-700 transition"
+              >
+                ↺ Reset
+              </button>
+            </div>
+          </div>
+
+          {/* Interactive Control Center Panel */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
+            
+            {/* Left Controls: Filter Builder (5 cols) */}
+            <div className="lg:col-span-5 bg-slate-900/95 border border-slate-800 p-5 rounded-2xl flex flex-col gap-4 shadow-xl">
+              <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                <span className="text-xs font-bold font-mono tracking-wider text-cyan-400 uppercase flex items-center gap-1.5">
+                  <span>🎛️</span> Kontrol Filter Data (WHERE)
+                </span>
+                <span className="text-[10px] text-slate-500 font-mono">STEP 1: ATUR KRITERIA</span>
+              </div>
+
+              {/* Filter 1 Block */}
+              <div className="p-3.5 rounded-xl bg-slate-950/80 border border-slate-800 space-y-3">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="font-semibold text-slate-300">Kriteria Utama:</span>
+                  <span className="text-[10px] font-mono text-emerald-400 bg-emerald-950/80 px-1.5 py-0.5 rounded border border-emerald-800/50">
+                    Kondisi 1
+                  </span>
+                </div>
+
+                {/* Column Selection */}
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="text-[10px] text-slate-400 font-medium">Pilih Kolom:</label>
+                    <select
+                      value={filterCol}
+                      onChange={(e) => {
+                        setFilterCol(e.target.value);
+                        sfx.click();
+                      }}
+                      className="w-full mt-1 bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white focus:ring-1 focus:ring-cyan-500 focus:outline-none"
+                    >
+                      <option value="jurusan">Jurusan Keahlian</option>
+                      <option value="nilai">Nilai Akhir Siswa</option>
+                      <option value="kehadiran">Kehadiran (%)</option>
+                      <option value="status">Status Kelulusan</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="text-[10px] text-slate-400 font-medium">Operator:</label>
+                    <select
+                      value={filterOp}
+                      onChange={(e) => {
+                        setFilterOp(e.target.value);
+                        sfx.click();
+                      }}
+                      className="w-full mt-1 bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white focus:ring-1 focus:ring-cyan-500 focus:outline-none"
+                    >
+                      <option value="=">Sama Dengan (=)</option>
+                      <option value="!=">Tidak Sama (!=)</option>
+                      {(filterCol === 'nilai' || filterCol === 'kehadiran') && (
+                        <>
+                          <option value=">">Lebih Dari (&gt;)</option>
+                          <option value=">=">Lebih Dari Sama (&gt;=)</option>
+                          <option value="<">Kurang Dari (&lt;)</option>
+                        </>
+                      )}
+                    </select>
+                  </div>
+                </div>
+
+                {/* Dynamic Value Input */}
+                <div className="pt-1">
+                  {(filterCol === 'jurusan') && (
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] text-slate-400 font-medium">Pilih Jurusan:</label>
+                      <div className="grid grid-cols-3 gap-2">
+                        {['RPL', 'TKJ', 'DMM'].map(j => (
+                          <button
+                            key={j}
+                            onClick={() => { setFilterValStr(j); sfx.click(); }}
+                            className={`py-1.5 rounded-lg text-xs font-bold transition border ${
+                              filterValStr === j
+                                ? 'bg-cyan-600 border-cyan-400 text-white shadow-md shadow-cyan-600/30'
+                                : 'bg-slate-900 border-slate-700 text-slate-400 hover:text-white'
+                            }`}
+                          >
+                            {j}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {(filterCol === 'status') && (
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] text-slate-400 font-medium">Status Siswa:</label>
+                      <div className="grid grid-cols-2 gap-2">
+                        {['Lulus', 'Remidi'].map(s => (
+                          <button
+                            key={s}
+                            onClick={() => { setFilterValStr(s); sfx.click(); }}
+                            className={`py-1.5 rounded-lg text-xs font-bold transition border ${
+                              filterValStr === s
+                                ? 'bg-cyan-600 border-cyan-400 text-white shadow-md shadow-cyan-600/30'
+                                : 'bg-slate-900 border-slate-700 text-slate-400 hover:text-white'
+                            }`}
+                          >
+                            {s}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {(filterCol === 'nilai' || filterCol === 'kehadiran') && (
+                    <div className="space-y-2">
+                      <div className="flex justify-between items-center text-xs">
+                        <label className="text-[10px] text-slate-400 font-medium">
+                          Batas Nilai / Angka:
+                        </label>
+                        <span className="font-mono font-bold text-cyan-400 bg-cyan-950 px-2 py-0.5 rounded border border-cyan-800 text-xs">
+                          {filterValNum} {filterCol === 'kehadiran' ? '%' : 'Poin'}
+                        </span>
+                      </div>
+                      <input
+                        type="range"
+                        min="50"
+                        max="100"
+                        step="1"
+                        value={filterValNum}
+                        onChange={(e) => setFilterValNum(e.target.value)}
+                        className="w-full accent-cyan-400"
+                      />
+                      <div className="flex justify-between text-[9px] font-mono text-slate-500">
+                        <span>Min: 50</span>
+                        <span>KKM: 75</span>
+                        <span>Max: 100</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Optional Second Condition Toggle (AND filter) */}
+              <div className="p-3.5 rounded-xl bg-slate-950/80 border border-slate-800 space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-semibold text-slate-300">Filter Tambahan (AND):</span>
+                  <button
+                    onClick={() => {
+                      setEnableSecondFilter(!enableSecondFilter);
+                      sfx.click();
+                    }}
+                    className={`px-2.5 py-1 rounded-lg text-[10px] font-bold font-mono transition border ${
+                      enableSecondFilter 
+                        ? 'bg-emerald-500 text-slate-950 border-emerald-400' 
+                        : 'bg-slate-800 text-slate-400 border-slate-700'
+                    }`}
+                  >
+                    {enableSecondFilter ? '✓ AKTIF (AND)' : '+ Tambah Kondisi'}
+                  </button>
+                </div>
+
+                {enableSecondFilter && (
+                  <div className="space-y-2 pt-1 border-t border-slate-800/70">
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="text-[9px] text-slate-400">Kolom Kedua:</label>
+                        <select
+                          value={filter2Col}
+                          onChange={(e) => setFilter2Col(e.target.value)}
+                          className="w-full mt-0.5 bg-slate-900 border border-slate-700 rounded-lg px-2 py-1 text-xs text-white"
+                        >
+                          <option value="nilai">Nilai Akhir</option>
+                          <option value="kehadiran">Kehadiran (%)</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="text-[9px] text-slate-400">Operator:</label>
+                        <select
+                          value={filter2Op}
+                          onChange={(e) => setFilter2Op(e.target.value)}
+                          className="w-full mt-0.5 bg-slate-900 border border-slate-700 rounded-lg px-2 py-1 text-xs text-white"
+                        >
+                          <option value=">">Lebih Dari (&gt;)</option>
+                          <option value=">=">Lebih Dari Sama (&gt;=)</option>
+                          <option value="<">Kurang Dari (&lt;)</option>
+                        </select>
+                      </div>
+                    </div>
+                    <div>
+                      <div className="flex justify-between text-[10px] text-slate-400">
+                        <span>Nilai Ambang:</span>
+                        <span className="font-mono text-cyan-400 font-bold">{filter2ValNum}</span>
+                      </div>
+                      <input
+                        type="range"
+                        min="50"
+                        max="100"
+                        value={filter2ValNum}
+                        onChange={(e) => setFilter2ValNum(e.target.value)}
+                        className="w-full accent-cyan-400 mt-1"
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Sorting and Column Display */}
+              <div className="grid grid-cols-2 gap-2 text-xs">
+                <div>
+                  <label className="text-[10px] text-slate-400 font-medium">Urutkan (ORDER BY):</label>
+                  <select
+                    value={sortBy}
+                    onChange={(e) => { setSortBy(e.target.value); sfx.click(); }}
+                    className="w-full mt-1 bg-slate-950 border border-slate-700 rounded-lg px-2 py-1.5 text-xs text-slate-200"
+                  >
+                    <option value="none">Default Urutan</option>
+                    <option value="nilai_desc">Nilai Tertinggi ➔ Terendah</option>
+                    <option value="nilai_asc">Nilai Terendah ➔ Tertinggi</option>
+                    <option value="nama_asc">Nama Siswa (A - Z)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="text-[10px] text-slate-400 font-medium">Tampilan Kolom (SELECT):</label>
+                  <div className="mt-1 flex flex-wrap gap-1">
+                    {['jurusan', 'nilai', 'kehadiran'].map(colKey => (
+                      <button
+                        key={colKey}
+                        onClick={() => {
+                          setVisibleCols(prev => ({ ...prev, [colKey]: !prev[colKey] }));
+                          sfx.click();
+                        }}
+                        className={`px-1.5 py-0.5 rounded text-[10px] border font-mono transition ${
+                          visibleCols[colKey]
+                            ? 'bg-cyan-950 text-cyan-300 border-cyan-800'
+                            : 'bg-slate-900 text-slate-500 border-slate-800 line-through'
+                        }`}
+                      >
+                        {colKey}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Action Button: Execute Filter */}
+              <button
+                onClick={runQuery}
+                disabled={isScanning}
+                className="w-full py-3 rounded-xl bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-500 hover:from-emerald-400 hover:to-cyan-400 text-slate-950 font-extrabold text-xs tracking-wider uppercase shadow-lg shadow-emerald-500/20 active:scale-[0.99] transition flex items-center justify-center gap-2"
+              >
+                {isScanning ? (
+                  <>
+                    <span className="animate-spin text-base">⏳</span>
+                    <span>MEMPROSES PENYARINGAN DATA...</span>
+                  </>
+                ) : (
+                  <>
+                    <span className="text-base">⚡</span>
+                    <span>JALANKAN FILTER & EKSEKUSI DATA</span>
+                  </>
+                )}
+              </button>
+
+            </div>
+
+            {/* Right Panel: Interactive Data Table (7 cols) */}
+            <div className="lg:col-span-7 flex flex-col gap-3">
+              
+              {/* Table Status Bar */}
+              <div className="flex items-center justify-between bg-slate-900/90 border border-slate-800 px-4 py-2.5 rounded-xl text-xs">
+                <div className="flex items-center gap-2">
+                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-400"></span>
+                  <span className="font-semibold text-slate-200">Tabel: Data Nilai & Prestasi Siswa</span>
+                </div>
+                <div className="font-mono text-[11px] text-slate-400">
+                  {hasExecuted ? (
+                    <span className="text-emerald-400 font-bold">
+                      Hasil: {matchedIds.length} dari {data.length} baris memenuhi syarat
+                    </span>
+                  ) : (
+                    <span>Total {data.length} Baris Data Tersedia</span>
+                  )}
+                </div>
+              </div>
+
+              {/* Animated Table Container */}
+              <div className="relative bg-slate-900/80 border border-slate-800 rounded-2xl overflow-hidden shadow-2xl">
+                
+                {/* Laser scanline effect during execution */}
+                {isScanning && (
+                  <div className="absolute inset-x-0 h-1 bg-gradient-to-r from-transparent via-cyan-400 to-transparent shadow-[0_0_15px_#22d3ee] animate-scanline z-30 pointer-events-none" />
+                )}
+
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs font-mono">
+                    <thead>
+                      <tr className="bg-slate-950 border-b border-slate-800 text-slate-400 uppercase text-[10px] tracking-wider">
+                        {visibleCols.id && <th className="p-3 w-10">No</th>}
+                        {visibleCols.nisn && <th className="p-3">NISN</th>}
+                        {visibleCols.nama && <th className="p-3">Nama Siswa</th>}
+                        {visibleCols.jurusan && <th className="p-3">Jurusan</th>}
+                        {visibleCols.nilai && <th className="p-3">Nilai</th>}
+                        {visibleCols.kehadiran && <th className="p-3">Presensi</th>}
+                        {visibleCols.status && <th className="p-3">Status</th>}
+                        <th className="p-3 text-right">Kesesuaian</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-800/50">
+                      {sortedData.map((item, idx) => {
+                        const isMatch = matchedIds.includes(item.id);
+                        
+                        return (
+                          <tr
+                            key={item.id}
+                            className={`transition-all duration-500 ${
+                              hasExecuted 
+                                ? (isMatch 
+                                    ? 'bg-emerald-950/30 text-emerald-100 font-medium shadow-[inset_3px_0_0_#10b981]' 
+                                    : 'opacity-20 blur-[0.4px] bg-slate-950/40 text-slate-500 scale-[0.99]')
+                                : 'hover:bg-slate-800/40 text-slate-300'
+                            }`}
+                          >
+                            {visibleCols.id && <td className="p-3 text-slate-500">{idx + 1}</td>}
+                            {visibleCols.nisn && <td className="p-3 font-mono text-slate-400">{item.nisn}</td>}
+                            {visibleCols.nama && (
+                              <td className="p-3 font-sans font-semibold text-white">
+                                {item.nama}
+                              </td>
+                            )}
+                            {visibleCols.jurusan && (
+                              <td className="p-3">
+                                <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                                  item.jurusan === 'RPL' ? 'bg-cyan-950 text-cyan-300 border border-cyan-800' :
+                                  item.jurusan === 'TKJ' ? 'bg-indigo-950 text-indigo-300 border border-indigo-800' :
+                                  'bg-amber-950 text-amber-300 border border-amber-800'
+                                }`}>
+                                  {item.jurusan}
+                                </span>
+                              </td>
+                            )}
+                            {visibleCols.nilai && (
+                              <td className="p-3 font-bold">
+                                <span className={item.nilai >= 75 ? 'text-emerald-400' : 'text-rose-400'}>
+                                  {item.nilai}
+                                </span>
+                              </td>
+                            )}
+                            {visibleCols.kehadiran && (
+                              <td className="p-3 text-slate-300">
+                                {item.kehadiran}%
+                              </td>
+                            )}
+                            {visibleCols.status && (
+                              <td className="p-3">
+                                <span className={`px-1.5 py-0.5 rounded text-[9px] font-semibold ${
+                                  item.status === 'Lulus' 
+                                    ? 'bg-emerald-950/80 text-emerald-400 border border-emerald-800/60' 
+                                    : 'bg-rose-950/80 text-rose-400 border border-rose-800/60'
+                                }`}>
+                                  {item.status}
+                                </span>
+                              </td>
+                            )}
+                            <td className="p-3 text-right">
+                              {hasExecuted && (
+                                isMatch ? (
+                                  <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-400 bg-emerald-950/90 px-2 py-0.5 rounded-full border border-emerald-800 animate-pulse">
+                                    <span>✓</span> LOLOS
+                                  </span>
+                                ) : (
+                                  <span className="text-[10px] text-slate-600">
+                                    TIDAK COCOK
+                                  </span>
+                                )
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+
+              </div>
+
+              {/* Visual SQL Translator Peek (Connecting Visual to SQL concept) */}
+              <div className="bg-slate-950 border border-slate-800/90 rounded-2xl p-4 shadow-xl">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <span className="text-cyan-400 text-xs font-mono font-bold">
+                      💻 SQL TRANSLATOR (Visual ke Sintaks Asli):
+                    </span>
+                  </div>
+                  <span className="text-[10px] text-slate-500 font-mono">
+                    Di balik layar, kontrol visualmu menghasilkan perintah ini:
+                  </span>
+                </div>
+                <pre className="p-3 rounded-xl bg-black/60 border border-slate-800/80 text-cyan-300 font-mono text-xs leading-relaxed overflow-x-auto">
+                  <code>{generatedSql}</code>
+                </pre>
+              </div>
+
+            </div>
+
+          </div>
+
+        </div>
+      );
+    }
+
+    // ==============================================================
+    // 3. JOIN & NORMALIZATION LABORATORY MODULE
+    // ==============================================================
+    function JoinNormalizationModule({ onMissionComplete, showNotification }) {
+      // Sub-tab: 'join' | 'norm'
+      const [subView, setSubView] = useState('join');
+
+      // Join Type Selection: 'inner' | 'left' | 'right' | 'full'
+      const [joinType, setJoinType] = useState('inner');
+      const [isMerging, setIsMerging] = useState(false);
+
+      // Normalization Wizard Step: 0 (Unnormalized), 1 (1NF), 2 (2NF), 3 (3NF)
+      const [normStep, setNormStep] = useState(0);
+
+      // Process Joined Results
+      const joinedData = useMemo(() => {
+        let results = [];
+
+        if (joinType === 'inner') {
+          // Only rows where peminjaman.id_siswa matches siswa.id_siswa
+          TABLE_PEMINJAMAN.forEach(p => {
+            const s = TABLE_DATA_SISWA.find(item => item.id_siswa === p.id_siswa);
+            if (s) {
+              results.push({
+                id_pinjam: p.id_pinjam,
+                id_siswa_pinjam: p.id_siswa,
+                judul_buku: p.judul_buku,
+                id_siswa_induk: s.id_siswa,
+                nama_siswa: s.nama_siswa,
+                kelas: s.kelas,
+                status: 'matched'
+              });
+            }
+          });
+        } else if (joinType === 'left') {
+          // All rows from Table Peminjaman + matching student or NULL
+          TABLE_PEMINJAMAN.forEach(p => {
+            const s = TABLE_DATA_SISWA.find(item => item.id_siswa === p.id_siswa);
+            results.push({
+              id_pinjam: p.id_pinjam,
+              id_siswa_pinjam: p.id_siswa,
+              judul_buku: p.judul_buku,
+              id_siswa_induk: s ? s.id_siswa : 'NULL',
+              nama_siswa: s ? s.nama_siswa : 'NULL (Siswa Tidak Terdaftar)',
+              kelas: s ? s.kelas : 'NULL',
+              status: s ? 'matched' : 'left_only'
+            });
+          });
+        } else if (joinType === 'right') {
+          // All rows from Table Data Siswa + matching loans or NULL
+          TABLE_DATA_SISWA.forEach(s => {
+            const loans = TABLE_PEMINJAMAN.filter(p => p.id_siswa === s.id_siswa);
+            if (loans.length > 0) {
+              loans.forEach(p => {
+                results.push({
+                  id_pinjam: p.id_pinjam,
+                  id_siswa_pinjam: p.id_siswa,
+                  judul_buku: p.judul_buku,
+                  id_siswa_induk: s.id_siswa,
+                  nama_siswa: s.nama_siswa,
+                  kelas: s.kelas,
+                  status: 'matched'
+                });
+              });
+            } else {
+              results.push({
+                id_pinjam: 'NULL',
+                id_siswa_pinjam: 'NULL',
+                judul_buku: 'NULL (Belum Pernah Meminjam)',
+                id_siswa_induk: s.id_siswa,
+                nama_siswa: s.nama_siswa,
+                kelas: s.kelas,
+                status: 'right_only'
+              });
+            }
+          });
+        }
+
+        return results;
+      }, [joinType]);
+
+      const handleSelectJoin = (type) => {
+        sfx.whoosh();
+        setIsMerging(true);
+        setJoinType(type);
+
+        setTimeout(() => {
+          setIsMerging(false);
+          sfx.success();
+          if (type === 'inner') {
+            onMissionComplete();
+          }
+        }, 350);
+      };
+
+      return (
+        <div className="flex flex-col gap-5">
+          
+          {/* Top Sub-Navigation (Join vs Normalisasi) */}
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-slate-900/90 border border-slate-800 p-4 rounded-2xl">
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="p-1.5 rounded-lg bg-violet-950 text-violet-400 border border-violet-800/60 font-mono text-xs">
+                  MODUL 3
+                </span>
+                <h2 className="text-base font-bold text-white">Laboratorium Hubungan Data & Normalisasi</h2>
+              </div>
+              <p className="text-xs text-slate-400 mt-1">
+                Visualisasikan cara kerja penggabungan relasi tabel (JOIN) dan tahapan pembersihan anomali tabel (1NF, 2NF, 3NF).
+              </p>
+            </div>
+
+            <div className="flex items-center bg-slate-950 p-1 rounded-xl border border-slate-800 text-xs">
+              <button
+                onClick={() => { setSubView('join'); sfx.click(); }}
+                className={`px-3 py-1.5 rounded-lg font-bold transition ${
+                  subView === 'join' 
+                    ? 'bg-violet-600 text-white shadow-md shadow-violet-600/30' 
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                🔗 Visual JOIN Table
+              </button>
+              <button
+                onClick={() => { setSubView('norm'); sfx.click(); }}
+                className={`px-3 py-1.5 rounded-lg font-bold transition ${
+                  subView === 'norm' 
+                    ? 'bg-violet-600 text-white shadow-md shadow-violet-600/30' 
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                🧹 Wizard Normalisasi (1NF-3NF)
+              </button>
+            </div>
+          </div>
+
+          {/* SUBVIEW 1: VISUAL JOIN LAB */}
+          {subView === 'join' && (
+            <div className="space-y-5">
+              
+              {/* Interactive Join Selector & Venn Diagram */}
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
+                
+                {/* Left: Join Mode Buttons (5 cols) */}
+                <div className="lg:col-span-5 bg-slate-900/95 border border-slate-800 p-5 rounded-2xl flex flex-col justify-between shadow-xl">
+                  <div>
+                    <span className="text-xs font-mono font-bold text-cyan-400 uppercase tracking-wider">
+                      PILIH METODE PENGGABUNGAN (JOIN)
+                    </span>
+                    <p className="text-xs text-slate-400 mt-1">
+                      Klik salah satu tombol untuk melihat bagaimana relasi Primary Key dan Foreign Key menghubungkan baris data kedua tabel.
+                    </p>
+
+                    <div className="space-y-2.5 mt-4">
+                      {/* INNER JOIN */}
+                      <button
+                        onClick={() => handleSelectJoin('inner')}
+                        className={`w-full p-3 rounded-xl border text-left transition-all flex items-start justify-between ${
+                          joinType === 'inner'
+                            ? 'bg-cyan-950/80 border-cyan-400 text-cyan-100 ring-2 ring-cyan-500/30 shadow-lg'
+                            : 'bg-slate-950/60 border-slate-800 text-slate-300 hover:bg-slate-800/60'
+                        }`}
+                      >
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="font-bold text-sm text-cyan-300">INNER JOIN</span>
+                            <span className="text-[10px] bg-cyan-900/70 text-cyan-200 px-1.5 py-0.2 rounded font-mono">
+                              Hanya yang Berelasi Cocok
+                            </span>
+                          </div>
+                          <p className="text-xs text-slate-400 mt-1">
+                            Hanya menampilkan transaksi peminjaman yang memiliki data siswa yang valid di database.
+                          </p>
+                        </div>
+                        <span className="text-xl">🎯</span>
+                      </button>
+
+                      {/* LEFT JOIN */}
+                      <button
+                        onClick={() => handleSelectJoin('left')}
+                        className={`w-full p-3 rounded-xl border text-left transition-all flex items-start justify-between ${
+                          joinType === 'left'
+                            ? 'bg-indigo-950/80 border-indigo-400 text-indigo-100 ring-2 ring-indigo-500/30 shadow-lg'
+                            : 'bg-slate-950/60 border-slate-800 text-slate-300 hover:bg-slate-800/60'
+                        }`}
+                      >
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="font-bold text-sm text-indigo-300">LEFT JOIN</span>
+                            <span className="text-[10px] bg-indigo-900/70 text-indigo-200 px-1.5 py-0.2 rounded font-mono">
+                              Semua Peminjaman
+                            </span>
+                          </div>
+                          <p className="text-xs text-slate-400 mt-1">
+                            Mempertahankan semua peminjaman buku. Jika siswa tidak ditemukan, kolom siswa bernilai <strong>NULL</strong>.
+                          </p>
+                        </div>
+                        <span className="text-xl">⬅️</span>
+                      </button>
+
+                      {/* RIGHT JOIN */}
+                      <button
+                        onClick={() => handleSelectJoin('right')}
+                        className={`w-full p-3 rounded-xl border text-left transition-all flex items-start justify-between ${
+                          joinType === 'right'
+                            ? 'bg-violet-950/80 border-violet-400 text-violet-100 ring-2 ring-violet-500/30 shadow-lg'
+                            : 'bg-slate-950/60 border-slate-800 text-slate-300 hover:bg-slate-800/60'
+                        }`}
+                      >
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="font-bold text-sm text-violet-300">RIGHT JOIN</span>
+                            <span className="text-[10px] bg-violet-900/70 text-violet-200 px-1.5 py-0.2 rounded font-mono">
+                              Semua Data Siswa
+                            </span>
+                          </div>
+                          <p className="text-xs text-slate-400 mt-1">
+                            Mempertahankan seluruh siswa, termasuk siswa yang belum pernah meminjam buku sama sekali.
+                          </p>
+                        </div>
+                        <span className="text-xl">➡️</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="mt-4 p-3 rounded-xl bg-slate-950 border border-slate-800 text-[11px] text-slate-400">
+                    <strong className="text-cyan-400 font-mono">KUNCI RELASI:</strong> Peminjaman.id_siswa ➔ Siswa.id_siswa
+                  </div>
+                </div>
+
+                {/* Right: Interactive Venn Diagram Visualizer (7 cols) */}
+                <div className="lg:col-span-7 bg-slate-900/95 border border-slate-800 p-5 rounded-2xl flex flex-col items-center justify-center shadow-xl">
+                  <div className="w-full flex items-center justify-between border-b border-slate-800 pb-2 mb-2">
+                    <span className="text-xs font-mono font-bold text-slate-400">DIAGRAM VENN VISUAL LOGIKA SET</span>
+                    <span className="text-[10px] font-mono text-cyan-400">STATUS: {joinType.toUpperCase()} AKTIF</span>
+                  </div>
+
+                  {/* SVG Venn Diagram */}
+                  <div className="relative w-full max-w-md h-52 flex items-center justify-center">
+                    <svg viewBox="0 0 400 200" className="w-full h-full">
+                      <defs>
+                        {/* Clip paths for intersection */}
+                        <clipPath id="circleA-clip">
+                          <circle cx="150" cy="100" r="75" />
+                        </clipPath>
+                        <clipPath id="circleB-clip">
+                          <circle cx="250" cy="100" r="75" />
+                        </clipPath>
+                      </defs>
+
+                      {/* Circle A: Tabel Peminjaman */}
+                      <circle
+                        cx="150"
+                        cy="100"
+                        r="75"
+                        fill={joinType === 'left' ? '#38bdf8' : '#1e293b'}
+                        fillOpacity={joinType === 'left' ? '0.6' : '0.4'}
+                        stroke="#06b6d4"
+                        strokeWidth="2.5"
+                      />
+
+                      {/* Circle B: Tabel Data Siswa */}
+                      <circle
+                        cx="250"
+                        cy="100"
+                        r="75"
+                        fill={joinType === 'right' ? '#a855f7' : '#1e293b'}
+                        fillOpacity={joinType === 'right' ? '0.6' : '0.4'}
+                        stroke="#8b5cf6"
+                        strokeWidth="2.5"
+                      />
+
+                      {/* Overlapping Intersection (Inner Join Area) */}
+                      <circle
+                        cx="150"
+                        cy="100"
+                        r="75"
+                        clipPath="url(#circleB-clip)"
+                        fill={joinType === 'inner' ? '#10b981' : (joinType === 'left' ? '#38bdf8' : '#a855f7')}
+                        fillOpacity={joinType === 'inner' ? '0.85' : '0.75'}
+                        stroke="#34d399"
+                        strokeWidth={joinType === 'inner' ? "3" : "1"}
+                        className={joinType === 'inner' ? 'animate-pulse' : ''}
+                      />
+
+                      {/* Venn Labels */}
+                      <text x="105" y="105" fill="#e2e8f0" fontSize="11" fontWeight="bold" textAnchor="middle">
+                        Tabel A (Pinjam)
+                      </text>
+                      <text x="200" y="105" fill="#ffffff" fontSize="12" fontWeight="900" textAnchor="middle">
+                        COCOK
+                      </text>
+                      <text x="295" y="105" fill="#e2e8f0" fontSize="11" fontWeight="bold" textAnchor="middle">
+                        Tabel B (Siswa)
+                      </text>
+                    </svg>
+                  </div>
+
+                  <p className="text-xs text-slate-300 text-center px-4 mt-2">
+                    {joinType === 'inner' && 'Wilayah hijau yang bersilangan adalah data yang memiliki pasangan ID yang cocok di kedua tabel.'}
+                    {joinType === 'left' && 'Lingkaran biru penuh menandakan seluruh baris Tabel A diambil, ditambah irisan dengan Tabel B.'}
+                    {joinType === 'right' && 'Lingkaran ungu penuh menandakan seluruh siswa di Tabel B diambil, ditambah irisan dengan Tabel A.'}
+                  </p>
+                </div>
+
+              </div>
+
+              {/* Source Tables Preview (Side by Side) */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                
+                {/* Table A: Peminjaman Buku */}
+                <div className="bg-slate-900/90 border border-cyan-500/30 rounded-2xl overflow-hidden shadow-lg">
+                  <div className="px-4 py-2.5 bg-cyan-950/60 border-b border-cyan-500/30 flex items-center justify-between text-xs font-bold text-cyan-300">
+                    <span>📘 Tabel A: Peminjaman_Buku</span>
+                    <span className="font-mono text-[10px] text-cyan-400">Primary Table</span>
+                  </div>
+                  <div className="p-3 overflow-x-auto">
+                    <table className="w-full text-left text-xs font-mono">
+                      <thead>
+                        <tr className="border-b border-slate-800 text-slate-400 text-[10px]">
+                          <th className="p-1.5">id_pinjam</th>
+                          <th className="p-1.5 text-cyan-400">id_siswa (FK)</th>
+                          <th className="p-1.5">judul_buku</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-800/40">
+                        {TABLE_PEMINJAMAN.map(p => (
+                          <tr key={p.id_pinjam} className="hover:bg-slate-800/30">
+                            <td className="p-1.5 text-slate-400">{p.id_pinjam}</td>
+                            <td className="p-1.5 font-bold text-cyan-300 bg-cyan-950/40">{p.id_siswa}</td>
+                            <td className="p-1.5 text-slate-200 truncate max-w-[140px]">{p.judul_buku}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                {/* Table B: Data Siswa */}
+                <div className="bg-slate-900/90 border border-violet-500/30 rounded-2xl overflow-hidden shadow-lg">
+                  <div className="px-4 py-2.5 bg-violet-950/60 border-b border-violet-500/30 flex items-center justify-between text-xs font-bold text-violet-300">
+                    <span>👨‍🎓 Tabel B: Data_Siswa</span>
+                    <span className="font-mono text-[10px] text-violet-400">Reference Table</span>
+                  </div>
+                  <div className="p-3 overflow-x-auto">
+                    <table className="w-full text-left text-xs font-mono">
+                      <thead>
+                        <tr className="border-b border-slate-800 text-slate-400 text-[10px]">
+                          <th className="p-1.5 text-violet-400">id_siswa (PK)</th>
+                          <th className="p-1.5">nama_siswa</th>
+                          <th className="p-1.5">kelas</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-800/40">
+                        {TABLE_DATA_SISWA.map(s => (
+                          <tr key={s.id_siswa} className="hover:bg-slate-800/30">
+                            <td className="p-1.5 font-bold text-violet-300 bg-violet-950/40">{s.id_siswa}</td>
+                            <td className="p-1.5 text-slate-200">{s.nama_siswa}</td>
+                            <td className="p-1.5 text-slate-400">{s.kelas}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+              </div>
+
+              {/* Combined Result Table After JOIN */}
+              <div className="bg-slate-900/95 border border-slate-800 rounded-2xl overflow-hidden shadow-2xl">
+                <div className="px-5 py-3 bg-slate-950 border-b border-slate-800 flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <span className="text-emerald-400 font-bold text-sm">✨ Hasil Penggabungan (Joined Output Result):</span>
+                    <span className="px-2 py-0.5 rounded bg-emerald-950 text-emerald-300 border border-emerald-800 text-xs font-mono">
+                      {joinType.toUpperCase()}
+                    </span>
+                  </div>
+                  <span className="text-xs font-mono text-slate-400">
+                    {joinedData.length} Baris Terkombinasi
+                  </span>
+                </div>
+
+                <div className="p-4 overflow-x-auto">
+                  <table className="w-full text-left text-xs font-mono">
+                    <thead>
+                      <tr className="border-b border-slate-800 text-slate-400 uppercase text-[10px] bg-slate-950/50">
+                        <th className="p-2.5 text-cyan-400">id_pinjam</th>
+                        <th className="p-2.5 text-cyan-400">Buku Dipinjam</th>
+                        <th className="p-2.5 text-amber-400">Kunci Relasi (id_siswa)</th>
+                        <th className="p-2.5 text-violet-400">Nama Siswa</th>
+                        <th className="p-2.5 text-violet-400">Kelas</th>
+                        <th className="p-2.5 text-right">Status Baris</th>
+                      </tr>
+                    </thead>
+                    <tbody className={`divide-y divide-slate-800/60 transition-opacity duration-300 ${isMerging ? 'opacity-30' : 'opacity-100'}`}>
+                      {joinedData.map((row, idx) => (
+                        <tr 
+                          key={idx}
+                          className={`hover:bg-slate-800/40 ${
+                            row.status === 'matched' 
+                              ? 'bg-slate-900/40' 
+                              : 'bg-amber-950/10'
+                          }`}
+                        >
+                          <td className="p-2.5 font-bold text-cyan-300">{row.id_pinjam}</td>
+                          <td className="p-2.5 text-slate-200">{row.judul_buku}</td>
+                          <td className="p-2.5 font-bold text-amber-400 bg-amber-950/20">
+                            {row.id_siswa_pinjam} ➔ {row.id_siswa_induk}
+                          </td>
+                          <td className="p-2.5">
+                            {row.nama_siswa.includes('NULL') ? (
+                              <span className="px-1.5 py-0.5 rounded bg-rose-950 text-rose-300 border border-rose-800 font-bold text-[10px]">
+                                NULL
+                              </span>
+                            ) : (
+                              <span className="text-slate-100 font-sans font-semibold">{row.nama_siswa}</span>
+                            )}
+                          </td>
+                          <td className="p-2.5 text-slate-300">{row.kelas}</td>
+                          <td className="p-2.5 text-right">
+                            {row.status === 'matched' ? (
+                              <span className="text-[10px] text-emerald-400 font-bold bg-emerald-950 px-2 py-0.5 rounded border border-emerald-800">
+                                ✓ COCOK
+                              </span>
+                            ) : (
+                              <span className="text-[10px] text-amber-400 font-bold bg-amber-950 px-2 py-0.5 rounded border border-amber-800">
+                                ! KOSONG (NULL)
+                              </span>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+            </div>
+          )}
+
+          {/* SUBVIEW 2: NORMALIZATION WIZARD (1NF - 3NF) */}
+          {subView === 'norm' && (
+            <div className="bg-slate-900/95 border border-slate-800 p-6 rounded-2xl shadow-xl space-y-6">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-slate-800 pb-4">
+                <div>
+                  <h3 className="font-bold text-base text-white">Visual Wizard Normalisasi Database</h3>
+                  <p className="text-xs text-slate-400 mt-1">
+                    Pelajari cara mengubah tabel data yang berantakan & redundan menjadi tabel relasional yang bersih tanpa anomali.
+                  </p>
+                </div>
+
+                {/* Step Indicators */}
+                <div className="flex items-center gap-2">
+                  {[
+                    { step: 0, label: 'Mentah (UNF)' },
+                    { step: 1, label: '1NF (Atomik)' },
+                    { step: 2, label: '2NF (Parsial)' },
+                    { step: 3, label: '3NF (Transitif)' },
+                  ].map(s => (
+                    <button
+                      key={s.step}
+                      onClick={() => { setNormStep(s.step); sfx.whoosh(); }}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-mono font-bold transition border ${
+                        normStep === s.step
+                          ? 'bg-violet-600 text-white border-violet-400 shadow-md'
+                          : 'bg-slate-950 text-slate-400 border-slate-800 hover:text-white'
+                      }`}
+                    >
+                      {s.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Step Explanations */}
+              <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 text-xs">
+                {normStep === 0 && (
+                  <div>
+                    <span className="font-bold text-rose-400 text-sm">❌ Bentuk Unnormalized (UNF) - Berantakan & Redundan:</span>
+                    <p className="text-slate-300 mt-1">
+                      Perhatikan kolom <strong>Hobi</strong> yang berisi banyak nilai dalam 1 sel (multi-value), dan data siswa diulang-ulang setiap kali siswa mengambil mata pelajaran baru. Ini memicu Anomali Pembaruan (Update Anomaly).
+                    </p>
+                  </div>
+                )}
+                {normStep === 1 && (
+                  <div>
+                    <span className="font-bold text-amber-400 text-sm">⚡ Tahap 1NF (First Normal Form) - Nilai Harus Atomik:</span>
+                    <p className="text-slate-300 mt-1">
+                      Setiap sel sekarang hanya berisi 1 nilai tunggal (atomik). Tidak ada lagi nilai koma dalam satu sel hobi. Namun data nama dan kota siswa masih berulang (belum 2NF).
+                    </p>
+                  </div>
+                )}
+                {normStep === 2 && (
+                  <div>
+                    <span className="font-bold text-cyan-400 text-sm">✨ Tahap 2NF (Second Normal Form) - Hilangkan Ketergantungan Parsial:</span>
+                    <p className="text-slate-300 mt-1">
+                      Tabel dipecah menjadi 2 tabel: <strong>Tabel Siswa</strong> dan <strong>Tabel Nilai Siswa</strong> yang dihubungkan melalui Primary Key <strong>nisn</strong>.
+                    </p>
+                  </div>
+                )}
+                {normStep === 3 && (
+                  <div>
+                    <span className="font-bold text-emerald-400 text-sm">🏆 Tahap 3NF (Third Normal Form) - Bersih Sempurna dari Anomali:</span>
+                    <p className="text-slate-300 mt-1">
+                      Tidak ada lagi ketergantungan transitif. Informasi Kota/Kode Pos dipisahkan ke <strong>Tabel Wilayah</strong>. Struktur database siap dipakai pada sistem aplikasi profesional skala industri!
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              {/* Step Tables Demonstration */}
+              {normStep === 0 && (
+                <div className="overflow-x-auto border border-rose-500/30 rounded-xl bg-slate-950">
+                  <table className="w-full text-left text-xs font-mono">
+                    <thead>
+                      <tr className="border-b border-slate-800 text-rose-300 bg-rose-950/30">
+                        <th className="p-2.5">NISN</th>
+                        <th className="p-2.5">Nama Siswa</th>
+                        <th className="p-2.5">Hobi (Multi-Value)</th>
+                        <th className="p-2.5">Mata Pelajaran</th>
+                        <th className="p-2.5">Nilai</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-800/60 text-slate-300">
+                      <tr>
+                        <td className="p-2.5">0071</td>
+                        <td className="p-2.5">Ahmad Rizky</td>
+                        <td className="p-2.5 text-rose-400 font-bold bg-rose-950/20">Coding, Futsal, Gaming</td>
+                        <td className="p-2.5">Basis Data</td>
+                        <td className="p-2.5">88</td>
+                      </tr>
+                      <tr>
+                        <td className="p-2.5">0071</td>
+                        <td className="p-2.5 text-slate-500">Ahmad Rizky (Duplikat)</td>
+                        <td className="p-2.5 text-rose-400 font-bold bg-rose-950/20">Coding, Futsal, Gaming</td>
+                        <td className="p-2.5">PBO</td>
+                        <td className="p-2.5">92</td>
+                      </tr>
+                      <tr>
+                        <td className="p-2.5">0072</td>
+                        <td className="p-2.5">Siti Nurhaliza</td>
+                        <td className="p-2.5 text-rose-400 font-bold bg-rose-950/20">Membaca, Robotik</td>
+                        <td className="p-2.5">Basis Data</td>
+                        <td className="p-2.5">94</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
+              {normStep === 1 && (
+                <div className="overflow-x-auto border border-amber-500/30 rounded-xl bg-slate-950">
+                  <table className="w-full text-left text-xs font-mono">
+                    <thead>
+                      <tr className="border-b border-slate-800 text-amber-300 bg-amber-950/30">
+                        <th className="p-2.5">NISN (PK)</th>
+                        <th className="p-2.5">Nama Siswa</th>
+                        <th className="p-2.5">Hobi (1 Nilai per Sel)</th>
+                        <th className="p-2.5">Mata Pelajaran</th>
+                        <th className="p-2.5">Nilai</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-800/60 text-slate-300">
+                      <tr>
+                        <td className="p-2.5">0071</td>
+                        <td className="p-2.5">Ahmad Rizky</td>
+                        <td className="p-2.5 text-emerald-400 font-semibold">Coding</td>
+                        <td className="p-2.5">Basis Data</td>
+                        <td className="p-2.5">88</td>
+                      </tr>
+                      <tr>
+                        <td className="p-2.5">0071</td>
+                        <td className="p-2.5">Ahmad Rizky</td>
+                        <td className="p-2.5 text-emerald-400 font-semibold">Futsal</td>
+                        <td className="p-2.5">Basis Data</td>
+                        <td className="p-2.5">88</td>
+                      </tr>
+                      <tr>
+                        <td className="p-2.5">0071</td>
+                        <td className="p-2.5">Ahmad Rizky</td>
+                        <td className="p-2.5 text-emerald-400 font-semibold">Gaming</td>
+                        <td className="p-2.5">Basis Data</td>
+                        <td className="p-2.5">88</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
+              {(normStep === 2 || normStep === 3) && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="border border-cyan-500/40 rounded-xl bg-slate-950 p-3">
+                    <span className="font-bold text-cyan-400 text-xs">📋 Tabel_Siswa (Induk)</span>
+                    <table className="w-full text-left text-[11px] font-mono mt-2">
+                      <thead>
+                        <tr className="text-slate-400 border-b border-slate-800">
+                          <th className="p-1.5">NISN (PK)</th>
+                          <th className="p-1.5">Nama Siswa</th>
+                          <th className="p-1.5">Jurusan</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-800/60">
+                        <tr>
+                          <td className="p-1.5 text-cyan-400 font-bold">0071</td>
+                          <td className="p-1.5">Ahmad Rizky</td>
+                          <td className="p-1.5">RPL</td>
+                        </tr>
+                        <tr>
+                          <td className="p-1.5 text-cyan-400 font-bold">0072</td>
+                          <td className="p-1.5">Siti Nurhaliza</td>
+                          <td className="p-1.5">RPL</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+
+                  <div className="border border-emerald-500/40 rounded-xl bg-slate-950 p-3">
+                    <span className="font-bold text-emerald-400 text-xs">📊 Tabel_Nilai_Mapel (Relasi)</span>
+                    <table className="w-full text-left text-[11px] font-mono mt-2">
+                      <thead>
+                        <tr className="text-slate-400 border-b border-slate-800">
+                          <th className="p-1.5 text-cyan-400">NISN (FK)</th>
+                          <th className="p-1.5">Mata Pelajaran</th>
+                          <th className="p-1.5">Nilai</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-800/60">
+                        <tr>
+                          <td className="p-1.5 text-cyan-400 font-bold">0071</td>
+                          <td className="p-1.5">Basis Data</td>
+                          <td className="p-1.5 text-emerald-400 font-bold">88</td>
+                        </tr>
+                        <tr>
+                          <td className="p-1.5 text-cyan-400 font-bold">0071</td>
+                          <td className="p-1.5">PBO</td>
+                          <td className="p-1.5 text-emerald-400 font-bold">92</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {/* Interactive Next Button */}
+              <div className="flex justify-between items-center pt-2">
+                <button
+                  disabled={normStep === 0}
+                  onClick={() => { setNormStep(s => s - 1); sfx.click(); }}
+                  className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 disabled:opacity-30 text-xs font-semibold text-slate-300 transition"
+                >
+                  ← Tahap Sebelumnya
+                </button>
+                <button
+                  disabled={normStep === 3}
+                  onClick={() => { setNormStep(s => s + 1); sfx.whoosh(); }}
+                  className="px-5 py-2 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 hover:brightness-110 disabled:opacity-30 text-xs font-bold text-white transition shadow-lg shadow-violet-600/30"
+                >
+                  {normStep === 2 ? 'Sempurnakan ke 3NF ➔' : 'Terapkan Normalisasi Selanjutnya ➔'}
+                </button>
+              </div>
+
+            </div>
+          )}
+
+        </div>
+      );
+    }
+
+    // Render App
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<DatabaseTycoonApp />);
+  </script>
+</body>
+</html>
